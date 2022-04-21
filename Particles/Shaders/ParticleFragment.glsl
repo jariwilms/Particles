@@ -2,10 +2,9 @@
 
 in vec4 fragmentColor;
 
-out vec4 FragColor;
+out vec4 color;
 
 void main()
 {
-    //todo: check if position check improves performance (window culling)
-    FragColor = fragmentColor;
+    color = fragmentColor;
 } 

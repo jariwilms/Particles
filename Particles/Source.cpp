@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <random>
+#include <cmath>
 #include <chrono>
 #include <Windows.h>
 
@@ -17,10 +18,11 @@
 #include "Shader.hpp"
 #include "Particle.hpp"
 
-constexpr auto NUM_PARTICLES = 10000;
+constexpr auto PARTICLE_BUFFER_SIZE = 1000000;
+constexpr auto NUM_PARTICLES = 100000;
 
 constexpr auto SCREEN_WIDTH = 800;
-constexpr auto SCREEN_HEIGHT = 600;
+constexpr auto SCREEN_HEIGHT = 800;
 
 constexpr auto MAX_PLATFORM_ENTRIES = 8;
 constexpr auto MAX_DEVICE_ENTRIES = 16;
@@ -105,25 +107,51 @@ const char* get_error_string(cl_int error)
     default: return "Unknown OpenCL error";
     }
 }
-void check_error(cl_int error, int line, int compareTo = CL_SUCCESS)
+void check_error(cl_int error, int line)
 {
-    if (error != compareTo)
+    if (error != CL_SUCCESS)
     {
         std::cerr << "CL::ERROR::" << get_error_string(error) << std::endl << "LINE " << line << std::endl;
         exit(EXIT_FAILURE);
     }
 }
+void check_program_compile_error(cl_int error, cl_program program, cl_device_id device_id, int line)
+{
+    if (error == CL_SUCCESS)
+        return;
+
+    size_t len = 0;
+    clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, NULL, NULL, &len);
+
+    char* log = new char[len];
+    clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, len, log, NULL);
+
+    std::cout << log;
+}
+void check_kernel_compile_error(cl_int error, cl_program program, cl_device_id device_id, int line) //zelfde code als hierboven GG uninstall
+{
+    if (error == CL_SUCCESS)
+        return;
+
+    size_t len = 0;
+    clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, NULL, NULL, &len);
+
+    char* log = new char[len];
+    clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, len, log, NULL);
+
+    std::cout << log;
+}
 
 GLFWwindow* setup_gl()
 {
     glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // glfw window creation
     // --------------------
-    GLFWwindow* window = glfwCreateWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "LearnOpenGL", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Particles", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -138,6 +166,8 @@ GLFWwindow* setup_gl()
         std::cout << "Failed to initialize GLAD" << std::endl;
         exit(1);
     }
+
+    glPointSize(1);
 
     return window;
 }
@@ -260,7 +290,7 @@ std::vector<Particle> generateParticles()
     std::vector<Particle> particles{};
 
     std::random_device rd;
-    std::default_random_engine generator(rd()); // rd() provides a random seed
+    std::default_random_engine generator(rd());
     std::uniform_real_distribution<float> positionDistribution(-1.0f, 1.0f);
     std::uniform_real_distribution<float> colorDistribution(0.0f, 1.0f);
     std::uniform_real_distribution<float> velocityDistribution(-0.001f, 0.001f);
@@ -286,6 +316,48 @@ std::vector<Particle> generateParticles()
     return particles;
 }
 
+std::vector<Particle> generateParticlesCircle()
+{
+    std::vector<Particle> particles{};
+    float r;
+    float theta;
+
+    std::random_device rd;
+    std::default_random_engine generator(rd());
+    std::uniform_real_distribution<float> positionDistribution(0.0f, 1.0f);
+    std::uniform_real_distribution<float> angleDistribution(0.0f, 2 * CL_M_PI);
+    std::uniform_real_distribution<float> colorDistribution(0.0f, 1.0f);
+    std::uniform_real_distribution<float> velocityDistribution(-1.0f, 1.0f);
+
+    glm::vec2 velocity;
+
+    for (int i = 0; i < NUM_PARTICLES; i++)
+    {
+        r = sqrt(positionDistribution(generator));
+        theta = positionDistribution(generator) * 2 * CL_M_PI;
+
+        velocity = glm::vec2(velocityDistribution(generator), velocityDistribution(generator));
+        velocity = glm::normalize(velocity);
+
+        particles.push_back(Particle(
+            r * cos(theta) * 0.3f,
+            r * sin(theta) * 0.3f,
+            0.0f,
+
+            colorDistribution(generator),
+            colorDistribution(generator),
+            colorDistribution(generator),
+            colorDistribution(generator),
+
+            velocity.x / 1000.0f, 
+            velocity.y / 1000.0f, 
+            0.0f
+        ));
+    }
+
+    return particles;
+}
+
 int main()
 {
     //OpenGL setup
@@ -304,7 +376,9 @@ int main()
     cl_command_queue command_queue;                         //program queue
 
     cl_program program; 
-    cl_kernel kernel;
+    cl_kernel kernel_gpu;
+    cl_kernel kernel_move;
+    cl_kernel kernel_cot;
 
     cl_mem particleBuffer;
 
@@ -341,10 +415,18 @@ int main()
 
 
 
-    Shader shader("Shaders/ParticleVertex.glsl", "Shaders/ParticleFragment.glsl");
-    shader.use();
+    std::vector<Particle> particleVertices = generateParticlesCircle();
 
-    std::vector<Particle> particleVertices = generateParticles();
+    size_t workSize;
+    clGetDeviceInfo(device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(workSize), &workSize, nullptr);
+    int ppu = particleVertices.size() / workSize + 1;
+
+    int random_int[2] = { 53478, 23842 };
+    float speedMultiplier = 0.1f;
+
+
+
+    Shader shader("Shaders/ParticleVertex.glsl", "Shaders/ParticleFragment.glsl");
 
 
 
@@ -355,7 +437,7 @@ int main()
     unsigned int VBO;
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, particleVertices.size() * sizeof(Particle), particleVertices.data(), GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, NUM_PARTICLES * sizeof(Particle), particleVertices.data(), GL_DYNAMIC_DRAW);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), nullptr);
     glEnableVertexAttribArray(0); //position
@@ -371,30 +453,31 @@ int main()
     check_error(error, __LINE__);
 
     error = clBuildProgram(program, 1, &device_id, NULL, NULL, NULL);
-    check_error(error, __LINE__);
+    check_program_compile_error(error, program, device_id, __LINE__);
 
-    kernel = clCreateKernel(program, "calculate_position", &error);
-    check_error(error, __LINE__);
+    kernel_move = clCreateKernel(program, "calculate_position", &error);
+    check_kernel_compile_error(error, program, device_id, __LINE__);
+    kernel_cot = clCreateKernel(program, "calculate_color_over_time", &error);
+    check_kernel_compile_error(error, program, device_id, __LINE__);
+    kernel_gpu = clCreateKernel(program, "generate_particles_uniform", &error);
+    check_kernel_compile_error(error, program, device_id, __LINE__);
 
     particleBuffer = clCreateFromGLBuffer(context, CL_MEM_READ_WRITE, VBO, &error);
     check_error(error, __LINE__);
 
-    error = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&particleBuffer);
-    int ppu = 10;
-    error = clSetKernelArg(kernel, 1, sizeof(int), &ppu);
-    check_error(error, __LINE__);
-    error = clSetKernelArg(kernel, 2, sizeof(float), &deltaTime);
-    check_error(error, __LINE__);
+    error = clSetKernelArg(kernel_gpu, 0, sizeof(cl_mem), (void*)&particleBuffer);
+    error = clSetKernelArg(kernel_gpu, 1, sizeof(int), &ppu);
+    error = clSetKernelArg(kernel_gpu, 2, 2 * sizeof(unsigned int), random_int);
+
+    error = clSetKernelArg(kernel_move, 0, sizeof(cl_mem), (void*)&particleBuffer);
+    error = clSetKernelArg(kernel_cot, 0, sizeof(cl_mem), (void*)&particleBuffer);
 
 
 
-    size_t val;
-    clGetDeviceInfo(device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(val), &val, nullptr);
-    size_t workSize = val;
 
 
-
-    glPointSize(1);
+    int passes = 0;
+    auto stopTime = std::chrono::steady_clock::now() + std::chrono::seconds(30);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -406,10 +489,18 @@ int main()
 
 
         error = clEnqueueAcquireGLObjects(command_queue, 1, &particleBuffer, 0, nullptr, nullptr);
-        error = clSetKernelArg(kernel, 2, sizeof(float), &deltaTime);
-        error = clEnqueueNDRangeKernel(command_queue, kernel, 1, nullptr, &workSize, nullptr, 0, nullptr, nullptr);
-        error = clEnqueueReleaseGLObjects(command_queue, 1, &particleBuffer, 0, nullptr, nullptr);
+
+        error = clSetKernelArg(kernel_move, 1, sizeof(int), &ppu);
+        error = clSetKernelArg(kernel_move, 2, sizeof(float), &deltaTime);
+        error = clSetKernelArg(kernel_move, 3, sizeof(float), &speedMultiplier);
+        error = clEnqueueNDRangeKernel(command_queue, kernel_move, 1, nullptr, &workSize, nullptr, 0, nullptr, nullptr);
+
+        //error = clSetKernelArg(kernel_cot, 1, sizeof(int), &ppu);
+        //error = clSetKernelArg(kernel_cot, 2, sizeof(float), &deltaTime);
+        //error = clEnqueueNDRangeKernel(command_queue, kernel_cot, 1, nullptr, &workSize, nullptr, 0, nullptr, nullptr);
+
         error = clFinish(command_queue);
+        error = clEnqueueReleaseGLObjects(command_queue, 1, &particleBuffer, 0, nullptr, nullptr);
 
 
 
@@ -424,6 +515,9 @@ int main()
 
         t1 = std::chrono::steady_clock::now();
         deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+
+        passes++;
+        if (t1 > stopTime) break;
     }
 
     glDeleteProgram(shader.ID);
@@ -431,11 +525,8 @@ int main()
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
 
-
-
-    //std::cout << "Total passes in 10 seconds: " << totalPasses;
-    //std::cin.get();
-
+    std::cout << "Total passes: " << passes << '\n';
+    std::cout << "Frames per second: " << passes / 30.0f << '\n';
 
 
     glfwTerminate();
