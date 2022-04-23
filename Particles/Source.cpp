@@ -508,7 +508,7 @@ int main()
     cl_mem clParticleBuffer;
     size_t particlesPerUnit;
     size_t particleCount = 0;
-    size_t particlesToGenerate = 10000;
+    size_t particlesToGenerate = 100000;
 
     std::vector<Attractor> hostAttractorBuffer;
     cl_mem clAttractorBuffer;
@@ -554,7 +554,7 @@ int main()
     check_error(error, __LINE__);
 
     //Generate attractor and move to cl buffer
-    hostAttractorBuffer.push_back(Attractor(0.3f, 0.3f, 0.0f, 0.0f, 1.0f));
+    hostAttractorBuffer.push_back(Attractor(0.3f, 0.3f, 0.0f, 0.0f, 0.1f));
     clAttractorBuffer = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR, 1 * sizeof(Attractor), hostAttractorBuffer.data(), &error);
     check_error(error, __LINE__);
 
@@ -594,7 +594,7 @@ int main()
     auto stopTime = std::chrono::steady_clock::now() + std::chrono::seconds(10);
 
     //Extra kernel arguments
-    float speedMultiplier = 0.1f;
+    float speedMultiplier = 1.0f;
 
     while (!glfwWindowShouldClose(window))
     {

@@ -99,11 +99,11 @@ __kernel void calculate_gravity(__global Particle* particles, int particleCount,
 		dx = attractors[0].x - particles[index].x;
 		dy = attractors[0].y - particles[index].y;
 
-		ir = 1.0f / (dx * dx + dy * dy + 0.001f);
+		ir = 1.0f / (dx * dx + dy * dy + 0.00001f);
 		ir = sqrt(ir);
 
-		particles[index].xa += dx * ir * attractors[0].gv * deltaTime * speedMultiplier;
-		particles[index].ya += dy * ir * attractors[0].gv * deltaTime * speedMultiplier;
+		particles[index].xv += dx * ir * attractors[0].gv * deltaTime * speedMultiplier;
+		particles[index].yv += dy * ir * attractors[0].gv * deltaTime * speedMultiplier;
 
 		++index;
 	}
