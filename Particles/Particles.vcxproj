@@ -143,12 +143,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="glad.c" />
-    <ClCompile Include="Particle.cpp" />
     <ClCompile Include="Source.cpp" />
     <ClCompile Include="Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ArrayObject.h" />
+    <ClInclude Include="Attractor.hpp" />
     <ClInclude Include="Device.h" />
     <ClInclude Include="Particle.hpp" />
     <ClInclude Include="Shader.hpp" />

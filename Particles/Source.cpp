@@ -18,6 +18,7 @@
 #include "Utils.h"
 #include "Shader.hpp"
 #include "Particle.hpp"
+#include "Attractor.hpp"
 #include "ArrayObject.h"
 
 constexpr auto PARTICLE_BUFFER_SIZE = 1000000; //1M
@@ -171,11 +172,14 @@ GLFWwindow* setup_gl()
         exit(1);
     }
 
-    glPointSize(2);
+    glfwSwapInterval(0);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_BLEND);
+    glPointSize(1);
 
     return window;
 }
-cl_platform_id select_platform()
+cl_platform_id _select_platform()
 {
     unsigned int answer;
 
@@ -210,7 +214,7 @@ cl_platform_id select_platform()
     platform_id = platform_arr[answer - 1];
     return platform_id;
 }
-cl_device_id select_device(cl_platform_id platform_id)
+cl_device_id _select_device(cl_platform_id platform_id)
 {
     unsigned int answer;
     int device_type;
@@ -274,7 +278,7 @@ cl_device_id select_device(cl_platform_id platform_id)
     device_id = device_arr[answer - 1];
     return device_id;
 }
-array_object create_particle_vertex_object(std::vector<Particle>& particles)
+array_object create_particle_vertex_object()
 {
     array_object ao{};
 
@@ -292,20 +296,54 @@ array_object create_particle_vertex_object(std::vector<Particle>& particles)
 
     return ao;
 }
+
 void setup_cl()
 {
     cl_platform_id platform_id;
     cl_device_id device_id;
 
-    cl_context context;
-    cl_command_queue command_queue;
+    //cl_context context;
+    //cl_command_queue command_queue;
 
-    platform_id = select_platform();
-    device_id = select_device(platform_id);
-
+    platform_id = _select_platform();
+    device_id = _select_device(platform_id);
 }
 
-void particle_generator_circle(std::vector<Particle>& particles, unsigned int offset, unsigned int amount)
+typedef void(* particle_generator)(std::vector<Particle>&, size_t, size_t);
+void _particle_generator_uniform(std::vector<Particle>& particles, size_t offset, size_t amount)
+{
+    std::random_device rd;
+    std::default_random_engine generator(rd());
+    std::uniform_real_distribution<float> positionDistribution(-1.0f, 1.0f);
+    std::uniform_real_distribution<float> colorDistribution(0.0f, 1.0f);
+    std::uniform_real_distribution<float> velocityDistribution(-0.1f, 0.1f);
+    std::uniform_real_distribution<float> lifeTimeDistribution(0.0f, 10.0f);
+
+    for (size_t i = 0; i < amount; i++)
+    {
+        particles[offset + i] = Particle(
+            positionDistribution(generator),
+            positionDistribution(generator),
+
+            0.0f, //colorDistribution(generator),
+            1.0f, //colorDistribution(generator),
+            0.0f, //colorDistribution(generator),
+            0.2f, //colorDistribution(generator),
+
+            //velocityDistribution(generator),
+            //velocityDistribution(generator),
+            0.0f, 
+            0.0f, 
+
+            0.0f,
+            0.0f,
+
+            //lifeTimeDistribution(generator)
+            100.0f
+        );
+    }
+}
+void _particle_generator_circle(std::vector<Particle>& particles, size_t offset, size_t amount)
 {
     float r;
     float theta;
@@ -313,16 +351,18 @@ void particle_generator_circle(std::vector<Particle>& particles, unsigned int of
     std::random_device rd;
     std::default_random_engine generator(rd());
     std::uniform_real_distribution<float> positionDistribution(0.0f, 1.0f);
-    std::uniform_real_distribution<float> angleDistribution(0.0f, 2 * CL_M_PI);
+    std::uniform_real_distribution<float> angleDistribution(0.0f, 2 * (float)CL_M_PI);
     std::uniform_real_distribution<float> colorDistribution(0.0f, 1.0f);
     std::uniform_real_distribution<float> velocityDistribution(-0.1f, 0.1f);
+    //std::uniform_real_distribution<float> accelerationDistribution(0.0f, -0.1f);
+    std::uniform_real_distribution<float> lifeTimeDistribution(0.0f, 10.0f);
 
     glm::vec2 velocity;
 
     for (int i = 0; i < amount; i++)
     {
         r = sqrt(positionDistribution(generator));
-        theta = positionDistribution(generator) * 2 * CL_M_PI;
+        theta = positionDistribution(generator) * 2 * (float)CL_M_PI;
 
         velocity = glm::vec2(velocityDistribution(generator), velocityDistribution(generator));
         velocity = glm::normalize(velocity);
@@ -336,85 +376,104 @@ void particle_generator_circle(std::vector<Particle>& particles, unsigned int of
             colorDistribution(generator),
             colorDistribution(generator),
 
-            velocity.x, 
-            velocity.y, 
+            velocity.x,
+            velocity.y,
 
-            5.0f
+            0.0f,
+            -2.0f, 
+            //accelerationDistribution(generator), 
+            //accelerationDistribution(generator), 
+
+            lifeTimeDistribution(generator)
         );
     }
 }
-void particle_generator_uniform(std::vector<Particle>& particles, unsigned int offset, unsigned int amount)
+void _particle_generator_cone(std::vector<Particle>& particles, size_t offset, size_t amount)
 {
     std::random_device rd;
     std::default_random_engine generator(rd());
-    std::uniform_real_distribution<float> positionDistribution(-1.0f, 1.0f);
+    std::uniform_real_distribution<float> positionDistribution(0.0f, 1.0f);
+    std::uniform_real_distribution<float> angleDistribution(0.0f, 2 * (float)CL_M_PI);
     std::uniform_real_distribution<float> colorDistribution(0.0f, 1.0f);
     std::uniform_real_distribution<float> velocityDistribution(-0.1f, 0.1f);
+    //std::uniform_real_distribution<float> accelerationDistribution(0.0f, -0.1f);
+    std::uniform_real_distribution<float> lifeTimeDistribution(0.0f, 10.0f);
 
-    for (size_t i = 0; i < amount; i++)
+    glm::vec2 velocity;
+
+    for (int i = 0; i < amount; i++)
     {
+        float angle = (90.0f - 0.0f) * positionDistribution(generator) + 0.0f;
+        angle = angle * (float)CL_M_PI / 180.0f;
+        velocity = glm::vec2(cos(angle), sin(angle));
+
         particles[offset + i] = Particle(
-            positionDistribution(generator),
-            positionDistribution(generator),
+            0.0f, 
+            0.0f, 
 
             colorDistribution(generator),
             colorDistribution(generator),
             colorDistribution(generator),
             colorDistribution(generator),
 
-            velocityDistribution(generator),
-            velocityDistribution(generator),
+            velocity.x,
+            velocity.y,
 
-            5.0f
+            0.0f,
+            0.0f, 
+
+            lifeTimeDistribution(generator)
         );
     }
 }
-void generate_particles_mt(std::vector<Particle>& particle_vec, unsigned int amount)
+
+void generate_particles_st(std::vector<Particle>& particles, size_t& particleCount, size_t amount, particle_generator generator)
 {
-    if (particle_vec.size() + amount > PARTICLE_BUFFER_SIZE)
-    {
-        std::cout << "Invalid particle buffer allocation: more particles generated than allowed buffer size\nLine " << __LINE__;
-        exit(1);
-    }
+    if (particleCount + amount > PARTICLE_BUFFER_SIZE) amount = PARTICLE_BUFFER_SIZE - particleCount;
+
+    generator(particles, particleCount, amount);
+    particleCount += amount;
+}
+void generate_particles_mt(std::vector<Particle>& particles, size_t& particleCount, size_t amount, particle_generator generator)
+{
+    if (particleCount + amount > PARTICLE_BUFFER_SIZE) amount = PARTICLE_BUFFER_SIZE - particleCount;
 
     constexpr auto THREAD_COUNT = 8;
-    unsigned int particlesPerThread = amount / THREAD_COUNT;
-    unsigned int particleRemainder = amount % THREAD_COUNT;
+    size_t particlesPerThread = amount / THREAD_COUNT;
+    size_t particleRemainder = amount % THREAD_COUNT;
 
     std::vector<std::thread> threads;
 
     for (int i = 0; i < THREAD_COUNT; i++)
     {
-        unsigned int offset = i * particlesPerThread;
-        threads.emplace_back([&, offset]() { particle_generator_circle(particle_vec, offset, particlesPerThread); });
+        size_t offset = i * particlesPerThread + particleCount;
+        threads.emplace_back([&, offset]() { generator(particles, offset, particlesPerThread); });
     }
 
-    if (particleRemainder != 0)
+    if (particleRemainder)
     {
-        unsigned int offset = THREAD_COUNT * particlesPerThread;
-        particle_generator_uniform(particle_vec, offset, particleRemainder);
+        size_t offset = THREAD_COUNT * particlesPerThread;
+        generator(particles, offset, particleRemainder);
     }
 
     for (auto& thread : threads)
         thread.join();
-}
 
-void remove_dead_particles(std::vector<Particle>& particle_vec)
+    particleCount += amount;
+}
+void remove_dead_particles(std::vector<Particle>& particles, size_t& particleCount)
 {
     Particle* pPtr;
-    size_t currentParticles = particle_vec.size();
-    size_t particlesToRemove = 0;
+    size_t removedParticles = 0;
 
-    for (size_t i = currentParticles; i > 0; i--)
+    for (size_t i = particleCount; i > 0; i--)
     {
-        pPtr = &particle_vec[i];
+        pPtr = &particles[i - 1];
 
-        if (pPtr->time_alive > pPtr->life_time)
+        if (pPtr->life_time > pPtr->time_to_live)
         {
-            *pPtr = particle_vec[currentParticles - particlesToRemove - 1];
-
-            currentParticles--;
-            particlesToRemove++;
+            *pPtr = particles[particleCount - removedParticles - 1];
+            particleCount--;
         }
     }
 }
@@ -425,78 +484,78 @@ int main()
     GLFWwindow* window = setup_gl();
 
     //OpenCL setup
-    cl_int error;											//OpenCL error code
+    cl_int error;										    //OpenCL error code
 
-    cl_uint num_platforms;                                  //Number of platforms present on the host. Value between 1 and MAX_PLATFORM_ENTRIES + 1
-    cl_platform_id platform_id;                             //Selected platform id
+    cl_uint numPlatforms;                                   //Number of platforms present on the host. Value between 1 and MAX_PLATFORM_ENTRIES + 1
+    cl_platform_id platformId;                              //Selected platform id
 
-    cl_uint num_devices;                                    //Number of devices present on the current platform. Value between 1 and MAX_DEVICE_ENTRIES + 1
-    cl_device_id device_id;                                 //Selected device id
+    cl_uint numDevices;                                     //Number of devices present on the current platform. Value between 1 and MAX_DEVICE_ENTRIES + 1
+    cl_device_id deviceId;                                  //Selected device id
 
     cl_context context;                                     //context for command queues
-    cl_command_queue command_queue;                         //program queue
+    cl_command_queue commandQueue;                          //program queue
 
     cl_program program;
-    cl_kernel kernel_ta;
-    cl_kernel kernel_mv;
-    cl_kernel kernel_cot;
+    cl_kernel kernelLT;
+    cl_kernel kernelMV;
+    cl_kernel kernelCOT;
+    cl_kernel kernelGV;
 
-    size_t global_work_size;
+    size_t globalWorkSize;
     //size_t local_work_size;
 
-    cl_mem cl_particle_buffer;
+    std::vector<Particle> hostParticleBuffer;
+    cl_mem clParticleBuffer;
+    size_t particlesPerUnit;
+    size_t particleCount = 0;
+    size_t particlesToGenerate = 10000;
 
-    unsigned int particlesAlive;
-    unsigned int particlesToGenerate;
-
-
-
-    std::vector<Particle> host_particle_buf;
-    host_particle_buf.reserve(PARTICLE_BUFFER_SIZE);
+    std::vector<Attractor> hostAttractorBuffer;
+    cl_mem clAttractorBuffer;
+    size_t attractorCount = 1;
+    //size_t attractorsToGenerate;
 
     Shader shader("Shaders/ParticleVertex.glsl", "Shaders/ParticleFragment.glsl");
     
 
 
     //Setup platform and device
-    error = clGetPlatformIDs(1, &platform_id, &num_platforms);
+    error = clGetPlatformIDs(1, &platformId, &numPlatforms);
     check_error(error, __LINE__);
 
-    error = clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_GPU, MAX_DEVICE_ENTRIES, &device_id, &num_devices);
+    error = clGetDeviceIDs(platformId, CL_DEVICE_TYPE_GPU, MAX_DEVICE_ENTRIES, &deviceId, &numDevices);
     check_error(error, __LINE__);
 
     cl_context_properties properties[] =
     {
        CL_GL_CONTEXT_KHR, (cl_context_properties)wglGetCurrentContext(),
        CL_WGL_HDC_KHR, (cl_context_properties)wglGetCurrentDC(),
-       CL_CONTEXT_PLATFORM, (cl_context_properties)platform_id,
+       CL_CONTEXT_PLATFORM, (cl_context_properties)platformId,
        NULL
     };
-
-    context = clCreateContext(properties, num_devices, &device_id, nullptr, nullptr, &error);
+    context = clCreateContext(properties, numDevices, &deviceId, nullptr, nullptr, &error);
     check_error(error, __LINE__);
 
-    command_queue = clCreateCommandQueue(context, device_id, NULL, &error);
+    commandQueue = clCreateCommandQueue(context, deviceId, NULL, &error);
     check_error(error, __LINE__);
 
-    clGetDeviceInfo(device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(global_work_size), &global_work_size, nullptr);
+    clGetDeviceInfo(deviceId, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(globalWorkSize), &globalWorkSize, nullptr);
 
 
 
-    //Generate initial particles
-    particlesToGenerate = 100000;
-    particlesAlive = particlesToGenerate;
-    std::vector<Particle> particle_vec{};
-    particle_vec.resize(particlesToGenerate);
-    generate_particles_mt(particle_vec, particlesToGenerate);
+    //Generate initial particles and move to gl buffer
+    hostParticleBuffer.resize(PARTICLE_BUFFER_SIZE);
+    generate_particles_mt(hostParticleBuffer, particleCount, particlesToGenerate, _particle_generator_uniform);
 
-
-
-    //Move host particle buffer to GPU memory
-    array_object ao = create_particle_vertex_object(particle_vec);
+    array_object ao = create_particle_vertex_object();
     glBufferData(GL_ARRAY_BUFFER, PARTICLE_BUFFER_SIZE * sizeof(Particle), nullptr, GL_DYNAMIC_DRAW);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, particle_vec.size() * sizeof(Particle), particle_vec.data());
-    cl_particle_buffer = clCreateFromGLBuffer(context, CL_MEM_READ_WRITE, ao.buffer, &error);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, particleCount * sizeof(Particle), hostParticleBuffer.data());
+    clParticleBuffer = clCreateFromGLBuffer(context, CL_MEM_READ_WRITE, ao.buffer, &error);
+    check_error(error, __LINE__);
+
+    //Generate attractor and move to cl buffer
+    hostAttractorBuffer.push_back(Attractor(0.3f, 0.3f, 0.0f, 0.0f, 1.0f));
+    clAttractorBuffer = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR, 1 * sizeof(Attractor), hostAttractorBuffer.data(), &error);
     check_error(error, __LINE__);
 
 
@@ -507,19 +566,22 @@ int main()
     program = clCreateProgramWithSource(context, 1, &kernelSource, NULL, &error);
     check_error(error, __LINE__);
 
-    error = clBuildProgram(program, 1, &device_id, NULL, NULL, NULL);
-    check_program_compile_error(error, program, device_id, __LINE__);
+    error = clBuildProgram(program, 1, &deviceId, NULL, NULL, NULL);
+    check_program_compile_error(error, program, deviceId, __LINE__);
 
-    kernel_ta = clCreateKernel(program, "adjust_time_alive", &error);
-    check_kernel_compile_error(error, program, device_id, __LINE__);
-    kernel_mv = clCreateKernel(program, "calculate_position", &error);
-    check_kernel_compile_error(error, program, device_id, __LINE__);
-    kernel_cot = clCreateKernel(program, "calculate_color_over_time", &error);
-    check_kernel_compile_error(error, program, device_id, __LINE__);
+    kernelLT = clCreateKernel(program, "calculate_life_time", &error);
+    check_kernel_compile_error(error, program, deviceId, __LINE__);
+    kernelMV = clCreateKernel(program, "calculate_movement", &error);
+    check_kernel_compile_error(error, program, deviceId, __LINE__);
+    kernelCOT = clCreateKernel(program, "calculate_color_over_time", &error);
+    check_kernel_compile_error(error, program, deviceId, __LINE__);
+    kernelGV = clCreateKernel(program, "calculate_gravity", &error);
+    check_kernel_compile_error(error, program, deviceId, __LINE__);
 
-    error = clSetKernelArg(kernel_ta, 0, sizeof(cl_mem), (void*)&cl_particle_buffer);
-    error = clSetKernelArg(kernel_mv, 0, sizeof(cl_mem), (void*)&cl_particle_buffer);
-    error = clSetKernelArg(kernel_cot, 0, sizeof(cl_mem), (void*)&cl_particle_buffer);
+    error = clSetKernelArg(kernelMV, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
+    error = clSetKernelArg(kernelCOT, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
+    error = clSetKernelArg(kernelLT, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
+    error = clSetKernelArg(kernelGV, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
 
 
 
@@ -533,10 +595,6 @@ int main()
 
     //Extra kernel arguments
     float speedMultiplier = 0.1f;
-    size_t ppu = particlesAlive / global_work_size;
-    ppu++;
-
-
 
     while (!glfwWindowShouldClose(window))
     {
@@ -547,33 +605,52 @@ int main()
 
 
 
-        error = clEnqueueAcquireGLObjects(command_queue, 1, &cl_particle_buffer, 0, nullptr, nullptr);
+        error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
-        error = clEnqueueReadBuffer(command_queue, cl_particle_buffer, CL_TRUE, 0, particlesAlive * sizeof(Particle), host_particle_buf.data(), NULL, nullptr, nullptr);
-        check_error(error, __LINE__);
+        error = clEnqueueReadBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
+        remove_dead_particles(hostParticleBuffer, particleCount);
+        //generate_particles_st(host_particle_buf, particleCount, 1, _particle_generator_cone);
+        error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
 
-        error = clSetKernelArg(kernel_ta, 1, sizeof(int), &ppu);
-        error = clSetKernelArg(kernel_ta, 2, sizeof(float), &deltaTime);
-        error = clEnqueueNDRangeKernel(command_queue, kernel_ta, 1, nullptr, &global_work_size, nullptr, 0, nullptr, nullptr);
+        particlesPerUnit = particleCount / globalWorkSize;
+        particlesPerUnit++;
 
-        error = clSetKernelArg(kernel_mv, 1, sizeof(int), &ppu);
-        error = clSetKernelArg(kernel_mv, 2, sizeof(float), &deltaTime);
-        error = clSetKernelArg(kernel_mv, 3, sizeof(float), &speedMultiplier);
-        error = clEnqueueNDRangeKernel(command_queue, kernel_mv, 1, nullptr, &global_work_size, nullptr, 0, nullptr, nullptr);
+        error = clSetKernelArg(kernelMV, 1, sizeof(int), &particleCount);
+        error = clSetKernelArg(kernelMV, 2, sizeof(int), &particlesPerUnit);
+        error = clSetKernelArg(kernelMV, 3, sizeof(float), &deltaTime);
+        error = clSetKernelArg(kernelMV, 4, sizeof(float), &speedMultiplier);
+        error = clEnqueueNDRangeKernel(commandQueue, kernelMV, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
 
-        error = clSetKernelArg(kernel_cot, 1, sizeof(int), &ppu);
-        error = clSetKernelArg(kernel_cot, 2, sizeof(float), &deltaTime);
-        error = clEnqueueNDRangeKernel(command_queue, kernel_cot, 1, nullptr, &global_work_size, nullptr, 0, nullptr, nullptr);
+        //error = clSetKernelArg(kernelCOT, 1, sizeof(int), &particleCount);
+        //error = clSetKernelArg(kernelCOT, 2, sizeof(int), &particlesPerUnit);
+        //error = clSetKernelArg(kernelCOT, 3, sizeof(float), &deltaTime);
+        //error = clSetKernelArg(kernelCOT, 4, sizeof(float), &speedMultiplier);
+        //error = clEnqueueNDRangeKernel(commandQueue, kernelCOT, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
 
-        error = clFinish(command_queue);
-        error = clEnqueueReleaseGLObjects(command_queue, 1, &cl_particle_buffer, 0, nullptr, nullptr);
+        error = clSetKernelArg(kernelLT, 1, sizeof(int), &particleCount);
+        error = clSetKernelArg(kernelLT, 2, sizeof(int), &particlesPerUnit);
+        error = clSetKernelArg(kernelLT, 3, sizeof(float), &deltaTime);
+        error = clSetKernelArg(kernelLT, 4, sizeof(float), &speedMultiplier);
+        error = clEnqueueNDRangeKernel(commandQueue, kernelLT, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
+
+        //__global Particle* particles, int particleCount, __global Attractor* attractors, int attractorCount, int particlesPerUnit, float deltaTime, float speedMultiplier
+        error = clSetKernelArg(kernelGV, 1, sizeof(int), &particleCount);
+        error = clSetKernelArg(kernelGV, 2, sizeof(cl_mem), &clAttractorBuffer);
+        error = clSetKernelArg(kernelGV, 3, sizeof(int), &attractorCount);
+        error = clSetKernelArg(kernelGV, 4, sizeof(int), &particlesPerUnit);
+        error = clSetKernelArg(kernelGV, 5, sizeof(float), &deltaTime);
+        error = clSetKernelArg(kernelGV, 6, sizeof(float), &speedMultiplier);
+        error = clEnqueueNDRangeKernel(commandQueue, kernelGV, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
+
+        error = clFinish(commandQueue);
+        error = clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
 
 
         shader.use();
         glBindVertexArray(ao.id);
         glBindBuffer(GL_ARRAY_BUFFER, ao.buffer);
-        glDrawArrays(GL_POINTS, 0, (GLsizei)particle_vec.size());
+        glDrawArrays(GL_POINTS, 0, (GLsizei)particleCount);
 
 
 
@@ -585,7 +662,7 @@ int main()
         deltaTime = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(t1 - t0).count() / 1000.0f;
         
         totalPasses++;
-        if (t1 > stopTime) break;
+        //if (t1 > stopTime) break;
     }
 
     glDeleteProgram(shader.ID);

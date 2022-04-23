@@ -1,28 +1,28 @@
 #pragma once
 
-#include "CL/cl.h"
+#include "CL/opencl.h"
 
 typedef struct Particle Particle;
 struct Particle
 {
 	Particle() = default;
-	Particle(float x, float y, float r, float g, float b, float a, float xv, float yv, float life_time)
-		: x{ x }, y{ y }, r{ r }, g{ g }, b{ b }, a{ a }, xv{ xv }, yv{ yv }, life_time{ life_time }, time_alive{ 0 } {}
+	Particle(cl_float x, cl_float y, cl_float r, cl_float g, cl_float b, cl_float a, cl_float xv, cl_float yv, cl_float xa, cl_float ya, cl_float time_to_live)
+		: x{ x }, y{ y }, r{ r }, g{ g }, b{ b }, a{ a }, xv{ xv }, yv{ yv }, xa{ xa }, ya{ ya }, time_to_live{ time_to_live }, life_time{ 0 } {}
 	
-	float x;
-	float y;
+	cl_float x;
+	cl_float y;
 
-	float r;
-	float g;
-	float b;
-	float a;
+	cl_float r;
+	cl_float g;
+	cl_float b;
+	cl_float a;
 
-	float xv;
-	float yv;
+	cl_float xv;
+	cl_float yv;
 
-	float time_alive;
-	float life_time;
+	cl_float xa;
+	cl_float ya;
 
-	Particle& operator+=(const Particle& rhs);
-	Particle& operator-=(const Particle& rhs);
+	cl_float life_time;
+	cl_float time_to_live;
 };

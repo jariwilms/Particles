@@ -16,110 +16,58 @@ typedef struct __attribute__ ((packed)) Particle
 	float xv;
 	float yv;
 
-	float time_alive;
-	float life_time;
+	float xa;
+	float ya;
+
+	float lt;
+	float ttl;
 } Particle;
 
-
-
-//__kernel void wang_hash(uint seed, uint* result)
-//{
-//        seed = (seed ^ 61) ^ (seed >> 16);
-//        seed *= 9;
-//
-//        seed = seed ^ (seed >> 4);
-//        seed *= 0x27D4EB2D;
-//
-//        seed = seed ^ (seed >> 15);
-//
-//        *result = seed;
-// }
-//
-//
-//
-//__kernel void generate_random_float(int global_id, float* result)
-//{
-//     uint random_uint;
-//	 wang_hash(global_id, &random_uint);
-//
-//     *result = (float)random_uint / (float)UINT_MAX;
-//}
-//
-//
-//
-//__kernel void generate_particles_uniform(__global Particle* particles, int particlesPerUnit, uint amount, uint2 random)
-//{
-//	int global_id = get_global_id(0);
-//	int index;
-//
-//	int random_x;
-//	int random_y;
-//
-//	//int random_vx;
-//	//int random_vy;
-//
-//	for (int i = 0; i < particlesPerUnit; i++)
-//	{
-//		index = global_id * particlesPerUnit + i;
-//
-//		generate_random_float(global_id * i + random.x, &random_x);
-//		generate_random_float(global_id * i + random.y, &random_y);
-//
-//		particles[index].x = random_x;
-//		particles[index].y = random_y;
-//
-//		particles[index].z = 0.0f;
-//
-//		particles[index].r = 1.0f;
-//		particles[index].g = 1.0f;
-//		particles[index].b = 1.0f;
-//		particles[index].a = 1.0f;
-//
-//		particles[index].xv = 0.0f;
-//		particles[index].yv = 0.0f;
-//	}
-//}
-
-
-
-__kernel void adjust_time_alive(__global Particle* particles, int particlesPerUnit, float deltaTime)
+typedef struct __attribute ((packed)) Attractor
 {
-	int global_id = get_global_id(0) * particlesPerUnit;
-	int index;
+	float x;
+	float y;
+
+	float xv;
+	float yv;
+
+	float gv;
+} Attractor;
+
+
+
+__kernel void calculate_movement(__global Particle* particles, int particleCount, int particlesPerUnit, float deltaTime, float speedMultiplier)
+{
+	size_t globalId = get_global_id(0);
+	size_t index = globalId * particlesPerUnit;
+	size_t final = ++globalId * particlesPerUnit - 1;
+
+	if (final > particleCount) particlesPerUnit -= final - particleCount;
 
 	for (int i = 0; i < particlesPerUnit; i++)
 	{
-		index = global_id + i;
-		particles[index].time_alive += deltaTime;
-	}
-}
-
-__kernel void calculate_position(__global Particle* particles, int particlesPerUnit, float deltaTime, float speedMultiplier)
-{
-	int global_id = get_global_id(0) * particlesPerUnit;
-	int index;
-
-	for (int i = 0; i < particlesPerUnit; i++)
-	{
-		index = global_id + i;
+		particles[index].xv += particles[index].xa * deltaTime * speedMultiplier;
+		particles[index].yv += particles[index].ya * deltaTime * speedMultiplier;
 
 		particles[index].x += particles[index].xv * deltaTime * speedMultiplier;
 		particles[index].y += particles[index].yv * deltaTime * speedMultiplier;
+
+		++index;
 	}
 }
 
 
 
-__kernel void calculate_color_over_time(__global Particle* particles, int particlesPerUnit, float deltaTime)
+__kernel void calculate_color_over_time(__global Particle* particles, int particleCount, int particlesPerUnit, float deltaTime, float speedMultiplier)
 {
-	int global_id = get_global_id(0) * particlesPerUnit;
-	deltaTime /= 1000.0f;
-	int index;
+	size_t globalId = get_global_id(0);
+	size_t index = globalId * particlesPerUnit;
+	size_t final = ++globalId * particlesPerUnit - 1;
+
+	if (final > particleCount) particlesPerUnit -= final - particleCount;
 
 	for (int i = 0; i < particlesPerUnit; i++)
 	{
-		index = global_id + i;
-
 		particles[index].r = particles[index].r + 1.0f * deltaTime;
 		particles[index].g = particles[index].g + 1.0f * deltaTime;
 		particles[index].b = particles[index].b + 1.0f * deltaTime;
@@ -127,5 +75,53 @@ __kernel void calculate_color_over_time(__global Particle* particles, int partic
 		if (particles[index].r > 1.0f) particles[index].r -= 1.0f;
 		if (particles[index].g > 1.0f) particles[index].g -= 1.0f;
 		if (particles[index].b > 1.0f) particles[index].b -= 1.0f;
+
+		++index;
+	}
+}
+
+
+
+__kernel void calculate_gravity(__global Particle* particles, int particleCount, __global Attractor* attractors, int attractorCount, int particlesPerUnit, float deltaTime, float speedMultiplier)
+{
+	size_t globalId = get_global_id(0);
+	size_t index = globalId * particlesPerUnit;
+	size_t final = ++globalId * particlesPerUnit - 1;
+
+	if (final > particleCount) particlesPerUnit -= final - particleCount;
+
+	float dx;
+	float dy;
+	float ir;
+
+	for (int i = 0; i < particlesPerUnit; i++)
+	{
+		dx = attractors[0].x - particles[index].x;
+		dy = attractors[0].y - particles[index].y;
+
+		ir = 1.0f / (dx * dx + dy * dy + 0.001f);
+		ir = sqrt(ir);
+
+		particles[index].xa += dx * ir * attractors[0].gv * deltaTime * speedMultiplier;
+		particles[index].ya += dy * ir * attractors[0].gv * deltaTime * speedMultiplier;
+
+		++index;
+	}
+}
+
+
+
+__kernel void calculate_life_time(__global Particle* particles, int particleCount, int particlesPerUnit, float deltaTime, float speedMultiplier)
+{
+	size_t globalId = get_global_id(0);
+	size_t index = globalId * particlesPerUnit;
+	size_t final = ++globalId * particlesPerUnit - 1;
+
+	if (final > particleCount) particlesPerUnit -= final - particleCount;
+
+	for (int i = 0; i < particlesPerUnit; i++)
+	{
+		particles[index].lt += deltaTime;
+		++index;
 	}
 }
