@@ -1,56 +1,62 @@
-const int PARTICLE_STRUCT_SIZE = 10;
-
-const int POSITION_OFFSET = 0;
-const int VELOCITY_OFFSET = POSITION_OFFSET + 7;
-
 typedef struct __attribute__ ((packed)) Particle
 {
-	float x;
-	float y;
+	float px;	
+	float py;
+	float pz;
 
-	float r;
-	float g;
-	float b;
-	float a;
+	float vx;	
+	float vy;
+	float vz;
 
-	float xv;
-	float yv;
+	float ax;	
+	float ay;
+	float az;
 
-	float xa;
-	float ya;
+	float cr;	
+	float cg;
+	float cb;
+	float ca;
 
-	float lt;
-	float ttl;
+	float en;	
 } Particle;
 
-typedef struct __attribute ((packed)) Attractor
+typedef struct __attribute__ ((packed)) Gravitor
 {
-	float x;
-	float y;
+	float px;
+	float py;
+	float pz;
 
-	float xv;
-	float yv;
+	float vx;
+	float vy;
+	float vz;
+
+	float cr;
+	float cg;
+	float cb;
+	float ca;
 
 	float gv;
-} Attractor;
+} Gravitor;
 
 
 
-__kernel void calculate_movement(__global Particle* particles, int particleCount, int particlesPerUnit, float deltaTime, float speedMultiplier)
+//Probably the yankiest pre-compiler shit I have ever done. Can't really complain if it works tho
+#define SETUP \
+	int globalId = get_global_id(0); \
+	int index = globalId * particlesPerUnit; \
+	int final = ++globalId * particlesPerUnit - 1; \
+	particlesPerUnit -= final > particleCount ? final - particleCount : 0;
+
+
+
+__kernel void calculate_movement(__global Particle* particles, int particleCount, int particlesPerUnit, float deltaTime)
 {
-	size_t globalId = get_global_id(0);
-	size_t index = globalId * particlesPerUnit;
-	size_t final = ++globalId * particlesPerUnit - 1;
-
-	if (final > particleCount) particlesPerUnit -= final - particleCount;
+	SETUP;
 
 	for (int i = 0; i < particlesPerUnit; i++)
 	{
-		particles[index].xv += particles[index].xa * deltaTime * speedMultiplier;
-		particles[index].yv += particles[index].ya * deltaTime * speedMultiplier;
-
-		particles[index].x += particles[index].xv * deltaTime * speedMultiplier;
-		particles[index].y += particles[index].yv * deltaTime * speedMultiplier;
+		particles[index].px += particles[index].vx * deltaTime;
+		particles[index].py += particles[index].vy * deltaTime;
 
 		++index;
 	}
@@ -58,23 +64,16 @@ __kernel void calculate_movement(__global Particle* particles, int particleCount
 
 
 
+//Deprecated, settings HSV in fragment shader is an order of magnitude or 2 faster apparently...
 __kernel void calculate_color_over_time(__global Particle* particles, int particleCount, int particlesPerUnit, float deltaTime, float speedMultiplier)
 {
-	size_t globalId = get_global_id(0);
-	size_t index = globalId * particlesPerUnit;
-	size_t final = ++globalId * particlesPerUnit - 1;
-
-	if (final > particleCount) particlesPerUnit -= final - particleCount;
+	SETUP;
 
 	for (int i = 0; i < particlesPerUnit; i++)
 	{
-		particles[index].r = particles[index].r + 1.0f * deltaTime;
-		particles[index].g = particles[index].g + 1.0f * deltaTime;
-		particles[index].b = particles[index].b + 1.0f * deltaTime;
-
-		if (particles[index].r > 1.0f) particles[index].r -= 1.0f;
-		if (particles[index].g > 1.0f) particles[index].g -= 1.0f;
-		if (particles[index].b > 1.0f) particles[index].b -= 1.0f;
+		particles[index].cr = fmod(particles[index].cr + deltaTime * speedMultiplier, 1);
+		particles[index].cg = fmod(particles[index].cg + deltaTime * speedMultiplier, 1);
+		particles[index].cb = fmod(particles[index].cb + deltaTime * speedMultiplier, 1);
 
 		++index;
 	}
@@ -82,28 +81,30 @@ __kernel void calculate_color_over_time(__global Particle* particles, int partic
 
 
 
-__kernel void calculate_gravity(__global Particle* particles, int particleCount, __global Attractor* attractors, int attractorCount, int particlesPerUnit, float deltaTime, float speedMultiplier)
+__kernel void calculate_gravity(__global Particle* particles, int particleCount, __global Gravitor* gravitors, int gravitorCount, int particlesPerUnit, float deltaTime)
 {
-	size_t globalId = get_global_id(0);
-	size_t index = globalId * particlesPerUnit;
-	size_t final = ++globalId * particlesPerUnit - 1;
+	SETUP;
 
-	if (final > particleCount) particlesPerUnit -= final - particleCount;
+	float dx, dy;
+	float inv, inv_r;
+	float ax, ay;
 
-	float dx;
-	float dy;
-	float ir;
-
-	for (int i = 0; i < particlesPerUnit; i++)
+	for (int i = 0; i < particlesPerUnit; ++i)
 	{
-		dx = attractors[0].x - particles[index].x;
-		dy = attractors[0].y - particles[index].y;
+		for (int j = 0; j < gravitorCount; j++)
+		{
+			dx = gravitors[j].px - particles[index].px;
+			dy = gravitors[j].py - particles[index].py;
 
-		ir = 1.0f / (dx * dx + dy * dy + 0.00001f);
-		ir = sqrt(ir);
-
-		particles[index].xv += dx * ir * attractors[0].gv * deltaTime * speedMultiplier;
-		particles[index].yv += dy * ir * attractors[0].gv * deltaTime * speedMultiplier;
+			inv = 1.0f / (dx * dx + dy * dy);
+			inv_r = sqrt(inv);
+	
+			ax = gravitors[j].gv * inv_r * dx;
+			ay = gravitors[j].gv * inv_r * dy;
+	
+			particles[index].vx += ax * deltaTime;
+			particles[index].vy += ay * deltaTime;
+		}
 
 		++index;
 	}
@@ -111,17 +112,13 @@ __kernel void calculate_gravity(__global Particle* particles, int particleCount,
 
 
 
-__kernel void calculate_life_time(__global Particle* particles, int particleCount, int particlesPerUnit, float deltaTime, float speedMultiplier)
+__kernel void calculate_energy(__global Particle* particles, int particleCount, int particlesPerUnit, float deltaTime)
 {
-	size_t globalId = get_global_id(0);
-	size_t index = globalId * particlesPerUnit;
-	size_t final = ++globalId * particlesPerUnit - 1;
-
-	if (final > particleCount) particlesPerUnit -= final - particleCount;
+	SETUP;
 
 	for (int i = 0; i < particlesPerUnit; i++)
 	{
-		particles[index].lt += deltaTime;
+		particles[index].en -= deltaTime;
 		++index;
 	}
 }

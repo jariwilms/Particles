@@ -142,22 +142,37 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Emitter.cpp" />
+    <ClCompile Include="Generators.cpp" />
     <ClCompile Include="glad.c" />
+    <ClCompile Include="OpenCL.cpp" />
+    <ClCompile Include="OpenGL.cpp" />
+    <ClCompile Include="PulseEmitter.cpp" />
     <ClCompile Include="Source.cpp" />
+    <ClCompile Include="StreamEmitter.cpp" />
     <ClCompile Include="Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ArrayObject.h" />
-    <ClInclude Include="Attractor.hpp" />
+    <ClInclude Include="Emitter.hpp" />
+    <ClInclude Include="Generators.h" />
+    <ClInclude Include="Gravitor.hpp" />
     <ClInclude Include="Device.h" />
+    <ClInclude Include="OpenCL.h" />
+    <ClInclude Include="OpenGL.h" />
     <ClInclude Include="Particle.hpp" />
+    <ClInclude Include="PulseEmitter.hpp" />
     <ClInclude Include="Shader.hpp" />
+    <ClInclude Include="Source.h" />
+    <ClInclude Include="StreamEmitter.hpp" />
     <ClInclude Include="Utils.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Kernels\Particles.cl" />
-    <None Include="Shaders\ParticleFragment.glsl" />
-    <None Include="Shaders\ParticleVertex.glsl" />
+    <None Include="Kernels\particles.cl" />
+    <None Include="Shaders\gravitor.fs" />
+    <None Include="Shaders\gravitor.vs" />
+    <None Include="Shaders\particle.fs" />
+    <None Include="Shaders\particle.vs" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
