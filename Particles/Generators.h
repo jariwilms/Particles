@@ -21,4 +21,3 @@ void _particle_generator_cone(_P_GEN_SIG);
 
 void generate_particles_st(GEN_SIG);
 void generate_particles_mt(GEN_SIG);
-void remove_dead_particles(std::vector<Particle>& particles, size_t& particleCount);

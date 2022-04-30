@@ -9,9 +9,21 @@ void create_gravitor(std::vector<Gravitor>& gravitors, size_t& gravitorCount, gl
     if (gravitorCount < 8) ++gravitorCount;
     indexToReplace = ++indexToReplace % GRAVITOR_BUFFER_SIZE;
 }
+void remove_dead_particles(Particle* particles, size_t& particleCount)
+{
+    //Traverse the array of alive particles in reverse
+    //Dead particles are switched with the backmost particle, and particleCount is decremented
+    for (size_t i = particleCount; i > 0; --i)
+    {
+        if (particles[i - 1].energy > 0.0f) continue;
+
+        particles[i - 1] = particles[particleCount - 1];
+        --particleCount;
+    }
+}
 void adjust_model_scale(float value, float& modelScale)
 {
-    modelScale += value / 100.0f;
+    modelScale += value / 50.0f;
 
     if (modelScale < 0.001f) modelScale = 0.001f;
     if (modelScale > 1.0f) modelScale = 1.0f;
@@ -49,7 +61,7 @@ int main()
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
     size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
     size_t particlesPerWorkItem;                                                        //Amount of particles each work item will update
-    size_t initialParticles = 100000;                                                   //Amount of particles to generate at the start of the simulation
+    size_t initialParticles = 1000000;                                                   //Amount of particles to generate at the start of the simulation
 
     std::vector<Gravitor> hostGravitorBuffer;                                           //Gravitor buffer of static size that remains on the host
     cl_mem clGravitorBuffer;                                                            //Pointer to GPU allocated gravitor buffer
@@ -174,11 +186,9 @@ int main()
     check_kernel_compile_error(error, program, deviceId, __LINE__);
 
     error = clSetKernelArg(kernelMV, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
-    error = clSetKernelArg(kernelEN, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
     error = clSetKernelArg(kernelGV, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
-
-
-
+    error = clSetKernelArg(kernelGV, 2, sizeof(cl_mem), &clGravitorBuffer);
+    error = clSetKernelArg(kernelEN, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
 
 
 
@@ -191,7 +201,6 @@ int main()
     clFinish(commandQueue);
     error = clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
-
     std::vector<Emitter> emitters =
     {
             StreamEmitter(hostParticleBuffer, 1000.0f),
@@ -199,6 +208,9 @@ int main()
     };
 
 
+
+    particlesPerWorkItem = particleCount / globalWorkSize;
+    particlesPerWorkItem++;
 
     startTime = std::chrono::high_resolution_clock::now();
     endTime = std::chrono::high_resolution_clock::now() + std::chrono::seconds(30);
@@ -211,10 +223,9 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
 
 
-
+        
         cursorScreenPosition = inputHandler.cursor_position();
         cursorWorldPosition = cursor_to_world_position(inputHandler.cursor_position(), modelScale, viewOffset, windowDimensions);
-        scrollValue = inputHandler.scroll_direction();
 
 
 
@@ -252,8 +263,10 @@ int main()
             --particleSize;
             if (particleSize == 0) particleSize = 1;
         }
-        if (scrollValue.y)
+        if (inputHandler.scroll_direction().y)
         {
+            scrollValue = inputHandler.scroll_direction();
+
             bool hueshiftKey = inputHandler.is_key_pressed(CHANGE_HUE_INPUT);
             bool saturationshiftKey = inputHandler.is_key_pressed(CHANGE_SATURATION_INPUT);
             bool valueshiftKey = inputHandler.is_key_pressed(CHANGE_VALUE_INPUT);
@@ -282,17 +295,24 @@ int main()
             }
         }
 
-        //for (auto& emitter : emitters) emitter.update(particleCount, deltaTime);
+        if (calculateEnergy)
+        {
+            error = clSetKernelArg(kernelEN, 1, sizeof(int), &particleCount);
+            error = clSetKernelArg(kernelEN, 2, sizeof(int), &particlesPerWorkItem);
+            error = clSetKernelArg(kernelEN, 3, sizeof(float), &deltaTime);
+            error = clEnqueueNDRangeKernel(commandQueue, kernelEN, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
 
-        particlesPerWorkItem = particleCount / globalWorkSize;
-        particlesPerWorkItem++;
+            Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_READ_WRITE, 0, particleCount * sizeof(Particle), 0, nullptr, nullptr, &error);
+            remove_dead_particles(particles, particleCount);
+            error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), particles, 0, nullptr, nullptr);
+            error = clEnqueueUnmapMemObject(commandQueue, clParticleBuffer, particles, 0, nullptr, nullptr);
 
-        //error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
-
+            particlesPerWorkItem = particleCount / globalWorkSize;
+            particlesPerWorkItem++;
+        }
         if (calculateGravity && calculateMovement)
         {
             error = clSetKernelArg(kernelGV, 1, sizeof(int), &particleCount);
-            error = clSetKernelArg(kernelGV, 2, sizeof(cl_mem), &clGravitorBuffer);
             error = clSetKernelArg(kernelGV, 3, sizeof(int), &gravitorCount);
             error = clSetKernelArg(kernelGV, 4, sizeof(int), &particlesPerWorkItem);
             error = clSetKernelArg(kernelGV, 5, sizeof(float), &deltaTime);
@@ -307,7 +327,6 @@ int main()
         }
 
         error = clFinish(commandQueue);
-        //error = clEnqueueReadBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
         error = clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
 
@@ -337,7 +356,6 @@ int main()
 
 
 
-        glFlush();
         glfwSwapBuffers(window);
         inputHandler.update();
 

@@ -22,15 +22,19 @@ public:
 	const glm::vec2& cursor_position() const;
 	const glm::vec2& scroll_direction() const;
 
+	bool is_any_key_pressed() const;
 	bool is_key_pressed(int key) const;
 	bool is_key_pressed_once(int key) const;
 
+	bool is_moving_cursor() const;
 	bool is_moving_cursor_x() const;
 	bool is_moving_cursor_y() const;
 
+	bool is_any_button_pressed() const;
 	bool is_button_pressed(int button) const;
 	bool is_button_pressed_once(int button) const;
 
+	bool is_scrolling() const;
 	bool is_scrolling_x(int direction) const;
 	bool is_scrolling_y(int direction) const;
 
@@ -54,5 +58,8 @@ private:
 
 	glm::vec2 m_scrollDirection;
 	glm::vec2 m_lastScrollDirection;
+
+	size_t m_activeKeyCount;
+	size_t m_activeButtonCount;
 };
 

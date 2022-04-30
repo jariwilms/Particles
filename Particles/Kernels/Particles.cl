@@ -45,17 +45,17 @@ typedef struct __attribute__ ((packed)) Gravitor
 //Shht
 #define SETUP \
 	int globalId = get_global_id(0); \
-	int index = globalId * particlesPerUnit; \
-	int final = ++globalId * particlesPerUnit - 1; \
-	particlesPerUnit -= final > particleCount ? final - particleCount : 0;
+	int index = globalId * ParticlesPerWorkItem; \
+	int final = ++globalId * ParticlesPerWorkItem - 1; \
+	ParticlesPerWorkItem -= final > particleCount ? final - particleCount : 0;
 
 
 
-__kernel void calculate_movement(__global Particle* particles, int particleCount, int particlesPerUnit, float deltaTime)
+__kernel void calculate_movement(__global Particle* particles, int particleCount, int ParticlesPerWorkItem, float deltaTime)
 {
 	SETUP;
 
-	for (int i = 0; i < particlesPerUnit; ++i)
+	for (int i = 0; i < ParticlesPerWorkItem; ++i)
 	{
 		particles[index].vx += particles[index].ax * deltaTime;
 		particles[index].vy += particles[index].ay * deltaTime;
@@ -72,7 +72,7 @@ __kernel void calculate_movement(__global Particle* particles, int particleCount
 
 
 
-__kernel void calculate_gravity(__global Particle* particles, int particleCount, __global Gravitor* gravitors, int gravitorCount, int particlesPerUnit, float deltaTime)
+__kernel void calculate_gravity(__global Particle* particles, int particleCount, __global Gravitor* gravitors, int gravitorCount, int ParticlesPerWorkItem, float deltaTime)
 {
 	SETUP;
 
@@ -80,7 +80,7 @@ __kernel void calculate_gravity(__global Particle* particles, int particleCount,
 	float inv, inv_r;
 	float ax, ay;
 
-	//for (int i = 0; i < particlesPerUnit; ++i)
+	//for (int i = 0; i < ParticlesPerWorkItem; ++i)
 	//{
 	//	const int G = 1;
 	//	const int EARTH_MASS = 10;
@@ -101,7 +101,7 @@ __kernel void calculate_gravity(__global Particle* particles, int particleCount,
 	//}
 
 
-	for (int i = 0; i < particlesPerUnit; ++i)
+	for (int i = 0; i < ParticlesPerWorkItem; ++i)
 	{
 		for (int j = 0; j < gravitorCount; ++j)
 		{
@@ -122,11 +122,11 @@ __kernel void calculate_gravity(__global Particle* particles, int particleCount,
 
 
 
-__kernel void calculate_energy(__global Particle* particles, int particleCount, int particlesPerUnit, float deltaTime)
+__kernel void calculate_energy(__global Particle* particles, int particleCount, int ParticlesPerWorkItem, float deltaTime)
 {
 	SETUP;
 
-	for (int i = 0; i < particlesPerUnit; ++i)
+	for (int i = 0; i < ParticlesPerWorkItem; ++i)
 	{
 		particles[index].en -= deltaTime;
 		++index;
@@ -136,11 +136,11 @@ __kernel void calculate_energy(__global Particle* particles, int particleCount, 
 
 
 //Deprecated, settings HSV in fragment shader is an order of magnitude or 2 faster apparently...
-__kernel void calculate_color_over_time(__global Particle* particles, int particleCount, int particlesPerUnit, float deltaTime, float speedMultiplier)
+__kernel void calculate_color_over_time(__global Particle* particles, int particleCount, int ParticlesPerWorkItem, float deltaTime, float speedMultiplier)
 {
 	SETUP;
 
-	for (int i = 0; i < particlesPerUnit; ++i)
+	for (int i = 0; i < ParticlesPerWorkItem; ++i)
 	{
 		particles[index].cr = fmod(particles[index].cr + deltaTime * speedMultiplier, 1);
 		particles[index].cg = fmod(particles[index].cg + deltaTime * speedMultiplier, 1);
