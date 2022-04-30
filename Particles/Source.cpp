@@ -49,7 +49,7 @@ int main()
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
     size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
     size_t particlesPerWorkItem;                                                        //Amount of particles each work item will update
-    size_t initialParticles = 10000;                                                    //Amount of particles to generate at the start of the simulation
+    size_t initialParticles = 100000;                                                   //Amount of particles to generate at the start of the simulation
 
     std::vector<Gravitor> hostGravitorBuffer;                                           //Gravitor buffer of static size that remains on the host
     cl_mem clGravitorBuffer;                                                            //Pointer to GPU allocated gravitor buffer
@@ -186,6 +186,11 @@ int main()
     settings.velocity_min = glm::vec3(2.0f, 0.0f, 0.0f);
     settings.velocity_max = glm::vec3(2.0f, 0.0f, 0.0f);
     Emitter::GenerateOnce(hostParticleBuffer, particleCount, initialParticles, _particle_generator_uniform, settings);
+    error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
+    error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
+    clFinish(commandQueue);
+    error = clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
+
 
     std::vector<Emitter> emitters =
     {
@@ -282,7 +287,7 @@ int main()
         particlesPerWorkItem = particleCount / globalWorkSize;
         particlesPerWorkItem++;
 
-        error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
+        //error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
 
         if (calculateGravity && calculateMovement)
         {
@@ -302,7 +307,7 @@ int main()
         }
 
         error = clFinish(commandQueue);
-        error = clEnqueueReadBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
+        //error = clEnqueueReadBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
         error = clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
 
@@ -340,7 +345,7 @@ int main()
         deltaTime = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(t1 - t0).count() / 1000.0f;
         
         updateCount++;
-        //if (t1 > stopTime) break;
+        if (t1 > endTime) break;
     }
 
     glDeleteProgram(particleShader.ID);
