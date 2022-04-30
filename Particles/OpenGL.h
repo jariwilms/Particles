@@ -8,5 +8,4 @@
 #include "GLM/gtc/type_ptr.hpp"
 #include "GLM/gtc/matrix_transform.hpp"
 
-GLFWwindow* setup_gl();
-bool isMousePressedOnce();
+GLFWwindow* setup_gl(glm::uvec2 windowDimensions);

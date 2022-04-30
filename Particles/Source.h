@@ -26,12 +26,27 @@
 #include "OpenCL.h"
 #include "OpenGL.h"
 #include "Generators.h"
+#include "InputHandler.hpp"
+#include "StreamEmitter.hpp"
+#include "PulseEmitter.hpp"
 
-extern float MODELSCALE;
 extern size_t PARTICLE_BUFFER_SIZE;
 extern size_t GRAVITOR_BUFFER_SIZE;
 
-extern double mouseX;
-extern double mouseY;
+#define MOVE_UP_INPUT GLFW_KEY_W
+#define MOVE_LEFT_INPUT GLFW_KEY_A
+#define MOVE_DOWN_INPUT GLFW_KEY_S
+#define MOVE_RIGHT_INPUT GLFW_KEY_D
 
-extern bool mousePressedOnce;
+#define SPAWN_GRAVITOR_INPUT GLFW_MOUSE_BUTTON_LEFT
+#define SPAWN_REPULSOR_INPUT GLFW_MOUSE_BUTTON_RIGHT
+
+#define TOGGLE_MOVEMENT_INPUT GLFW_KEY_P
+#define TOGGLE_GRAVITY_INPUT GLFW_KEY_C
+
+#define CHANGE_HUE_INPUT GLFW_KEY_F
+#define CHANGE_SATURATION_INPUT GLFW_KEY_G
+#define CHANGE_VALUE_INPUT GLFW_KEY_H
+
+#define INCREASE_POINT_SIZE_INPUT GLFW_KEY_KP_ADD
+#define DECREASE_POINT_SIZE_INPUT GLFW_KEY_KP_SUBTRACT

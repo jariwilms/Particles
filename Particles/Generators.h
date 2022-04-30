@@ -1,18 +1,24 @@
-#pragma once
 
 #include <iostream>
 #include <vector>
 #include <random>
 #include <thread>
 
-#include "Particle.hpp"
 #include "OpenCL.h"
 
-typedef void(*particle_generator)(std::vector<Particle>&, size_t, size_t);
-void _particle_generator_uniform(std::vector<Particle>& particles, size_t offset, size_t amount);
-void _particle_generator_circle(std::vector<Particle>& particles, size_t offset, size_t amount);
-void _particle_generator_cone(std::vector<Particle>& particles, size_t offset, size_t amount);
+#include "Particle.hpp"
+#include "GeneratorSettings.hpp"
 
-void generate_particles_st(std::vector<Particle>& particles, size_t& particleCount, size_t amount, particle_generator generator);
-void generate_particles_mt(std::vector<Particle>& particles, size_t& particleCount, size_t amount, particle_generator generator);
+using ParticleGenerator = void(*)(std::vector<Particle>& particles, size_t particleCount, size_t amount, GeneratorSettings settings);
+
+#define _P_GEN_SIG std::vector<Particle>& particles, size_t offset, size_t amount, GeneratorSettings settings
+#define GEN_SIG std::vector<Particle>& particles, size_t& particleCount, size_t amount, ParticleGenerator generator
+// https://www.youtube.com/watch?v=UvZjzKOpdVM
+
+void _particle_generator_uniform(_P_GEN_SIG);
+void _particle_generator_circle(_P_GEN_SIG);
+void _particle_generator_cone(_P_GEN_SIG);
+
+void generate_particles_st(GEN_SIG);
+void generate_particles_mt(GEN_SIG);
 void remove_dead_particles(std::vector<Particle>& particles, size_t& particleCount);

@@ -1,88 +1,117 @@
 #include "Source.h"
 
-void create_gravitor(std::vector<Gravitor>& gravitors, size_t& gravitorCount, glm::vec3 position, float strength = 10.0f)
+void create_gravitor(std::vector<Gravitor>& gravitors, size_t& gravitorCount, glm::vec2 position, float strength = 1.0f)
 {
     static size_t indexToReplace = 0;
 
-    gravitors[indexToReplace] = Gravitor(position, glm::vec3(0.0f), glm::vec4(1.0f), strength);
+    gravitors[indexToReplace] = Gravitor(glm::vec3(position, 0.0f), glm::vec3(0.0f), glm::vec4(1.0f), strength);
     
     if (gravitorCount < 8) ++gravitorCount;
     indexToReplace = ++indexToReplace % GRAVITOR_BUFFER_SIZE;
 }
+void adjust_model_scale(float value, float& modelScale)
+{
+    modelScale += value / 100.0f;
+
+    if (modelScale < 0.001f) modelScale = 0.001f;
+    if (modelScale > 1.0f) modelScale = 1.0f;
+}
+glm::vec2 cursor_to_world_position(glm::vec2 cursorScreenPosition, float modelScale, glm::vec3 viewOffset, glm::uvec2 windowDimensions)
+{
+    return glm::vec2(
+        ( cursorScreenPosition.x * 2 / windowDimensions.x - viewOffset.x - 1.0f) / modelScale,
+        (-cursorScreenPosition.y * 2 / windowDimensions.y - viewOffset.y + 1.0f) / modelScale);
+}
 
 int main()
 {
-    //OpenGL setup
-    GLFWwindow* window = setup_gl();
+    cl_int error;								                                        //OpenCL error code return
+
+    cl_uint numPlatforms;                                                               //Number of platforms present on the host. Value from 1 to MAX_PLATFORM_ENTRIES
+    cl_platform_id platformId;                                                          //Selected platform id
+
+    cl_uint numDevices;                                                                 //Number of devices present on the current platform. Value from 1 to MAX_DEVICE_ENTRIES
+    cl_device_id deviceId;                                                              //Selected device id
+
+    cl_context context;                                                                 //Device context
+    cl_command_queue commandQueue;                                                      //Queue for device commands
+
+    cl_program program;                                                                 //Program that contains kernels
+    cl_kernel kernelMV;                                                                 //KERNEL: Calculates particle movement
+    cl_kernel kernelGV;                                                                 //KERNEL: Calculates particle gravity
+    cl_kernel kernelEN;                                                                 //KERNEL: Calculates particle energy
+
+    size_t globalWorkSize;                                                              //Maximum amount of work groups supported by the GPU
+
+
+
+    std::vector<Particle> hostParticleBuffer;                                           //Particle buffer of static size that remains on the host
+    cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
+    size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
+    size_t particlesPerWorkItem;                                                        //Amount of particles each work item will update
+    size_t initialParticles = 10000;                                                    //Amount of particles to generate at the start of the simulation
+
+    std::vector<Gravitor> hostGravitorBuffer;                                           //Gravitor buffer of static size that remains on the host
+    cl_mem clGravitorBuffer;                                                            //Pointer to GPU allocated gravitor buffer
+    size_t gravitorCount{};                                                             //Amount of gravitors = > separate variable to prevent host / GPU buffer resizing (kinda useless because GRAVITOR_BUFFER_SIZE is 8
+
+
+
+    glm::uvec2 windowDimensions(800);                                                   //Dimensions of viewport
+    GLFWwindow* window = setup_gl(windowDimensions);                                    //OpenGL setup
+    InputHandler inputHandler(window);                                                  //InputHandler class
+    Shader particleShader("Shaders/particle.vs", "Shaders/particle.fs");                //Particle shader
+    Shader gravitorShader("Shaders/gravitor.vs", "Shaders/gravitor.fs");                //Gravitor shader
+
+
+
+    std::chrono::high_resolution_clock::time_point startTime;                           //Start time of the simulation, initialized before update loop
+    std::chrono::high_resolution_clock::time_point endTime;                             //Time to elapse before stopping the simulation
+    std::chrono::high_resolution_clock::time_point t0;                                  //Time point before loop executes
+    std::chrono::high_resolution_clock::time_point t1;                                  //Time point after loop has executed
+    unsigned int updateCount{};                                                         //Total amount of updates the simulation has done
+    float deltaTime{};                                                                  //Elapsed time between each update
+
+
+
+    bool calculateMovement = true;                                                      //Should movement be calculated every update?
+    bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
+    bool calculateEnergy = false;                                                       //Should energy be calculated every update?
+
+    glm::vec3 hsv(0.0f, 0.0f, 0.0f);
+    glm::vec2 cursorScreenPosition{};                                                   //The on-screen position of the cursor
+    glm::vec2 cursorWorldPosition{};                                                    //The modelScale adjusted world position
+    glm::vec2 scrollValue{};                                                            //The inputted scroll direction
+
+    int particleSize = 1;                                                               //Size of particles
+    float speedMultiplier = 0.1f;                                                       //Calculation speed modifier (works only on hue shifting atm)
+    float modelScale = 0.2f;                                                            //The zoom scale
+    glm::vec3 viewOffset(0.0f);                                                         //Camera position
+
+
 
     //OpenCL setup
-    cl_int error;										    //OpenCL error code
-
-    cl_uint numPlatforms;                                   //Number of platforms present on the host. Value between 1 and MAX_PLATFORM_ENTRIES + 1
-    cl_platform_id platformId;                              //Selected platform id
-
-    cl_uint numDevices;                                     //Number of devices present on the current platform. Value between 1 and MAX_DEVICE_ENTRIES + 1
-    cl_device_id deviceId;                                  //Selected device id
-
-    cl_context context;                                     //context for command queues
-    cl_command_queue commandQueue;                          //program queue
-
-    cl_program program;
-    cl_kernel kernelLT;
-    cl_kernel kernelMV;
-    cl_kernel kernelCOT;
-    cl_kernel kernelGV;
-
-    size_t globalWorkSize;
-    //size_t local_work_size;
-    
-    Shader particleShader("Shaders/particle.vs", "Shaders/particle.fs");
-    Shader gravitorShader("Shaders/gravitor.vs", "Shaders/gravitor.fs");
-
-
-    std::vector<Particle> hostParticleBuffer;
-    cl_mem clParticleBuffer;
-    size_t particlesPerUnit;
-    size_t particleCount{};
-    size_t particlesToGenerate = 100000;
-
-    std::vector<Gravitor> hostGravitorBuffer;
-    cl_mem clGravitorBuffer;
-    size_t gravitorCount{};
-
-    bool calculateGravity = true;
-
-
-
-    //Setup platform and device
     error = clGetPlatformIDs(1, &platformId, &numPlatforms);
-    check_error(error, __LINE__);
-
     error = clGetDeviceIDs(platformId, CL_DEVICE_TYPE_GPU, 1, &deviceId, &numDevices);
-    check_error(error, __LINE__);
 
-    cl_context_properties properties[] =
+    cl_context_properties properties[] = 
     {
        CL_GL_CONTEXT_KHR, (cl_context_properties)wglGetCurrentContext(),
        CL_WGL_HDC_KHR, (cl_context_properties)wglGetCurrentDC(),
        CL_CONTEXT_PLATFORM, (cl_context_properties)platformId,
        NULL
     };
+
     context = clCreateContext(properties, numDevices, &deviceId, nullptr, nullptr, &error);
-    check_error(error, __LINE__);
-
     commandQueue = clCreateCommandQueue(context, deviceId, NULL, &error);
-    check_error(error, __LINE__);
-
     clGetDeviceInfo(deviceId, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(globalWorkSize), &globalWorkSize, nullptr);
 
 
 
 
 
-    //Create GL and CL Particle buffer
+    //Create shared particle buffer
     hostParticleBuffer.resize(PARTICLE_BUFFER_SIZE);
-    generate_particles_mt(hostParticleBuffer, particleCount, particlesToGenerate, _particle_generator_uniform);
 
     unsigned int PART_VAO, PART_VBO;
     glGenVertexArrays(1, &PART_VAO);
@@ -103,7 +132,7 @@ int main()
 
 
 
-    //Create CL and GL Gravitor buffer
+    //Create shared gravitor buffer
     hostGravitorBuffer.resize(GRAVITOR_BUFFER_SIZE);
     create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f));
     clGravitorBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, GRAVITOR_BUFFER_SIZE * sizeof(Gravitor), nullptr, &error);
@@ -126,7 +155,9 @@ int main()
 
 
 
-    //Create program with kernels
+
+
+    //Create program and compile GPU kernels
     const char* kernelSource = Utils::read_file("Kernels/particles.cl");
 
     program = clCreateProgramWithSource(context, 1, &kernelSource, NULL, &error);
@@ -139,89 +170,148 @@ int main()
     check_kernel_compile_error(error, program, deviceId, __LINE__);
     kernelGV = clCreateKernel(program, "calculate_gravity", &error);
     check_kernel_compile_error(error, program, deviceId, __LINE__);
-    kernelLT = clCreateKernel(program, "calculate_energy", &error);
+    kernelEN = clCreateKernel(program, "calculate_energy", &error);
     check_kernel_compile_error(error, program, deviceId, __LINE__);
 
     error = clSetKernelArg(kernelMV, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
-    error = clSetKernelArg(kernelLT, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
+    error = clSetKernelArg(kernelEN, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
     error = clSetKernelArg(kernelGV, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
 
 
 
 
 
-    //Timing
-    std::chrono::high_resolution_clock::time_point startTime = std::chrono::high_resolution_clock::now();
-    std::chrono::high_resolution_clock::time_point t0;
-    std::chrono::high_resolution_clock::time_point t1;
-    float deltaTime = 0.0f;
 
-    unsigned int totalPasses{};
-    auto stopTime = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    GeneratorSettings settings;
+    settings.velocity_min = glm::vec3(2.0f, 0.0f, 0.0f);
+    settings.velocity_max = glm::vec3(2.0f, 0.0f, 0.0f);
+    Emitter::GenerateOnce(hostParticleBuffer, particleCount, initialParticles, _particle_generator_uniform, settings);
 
-    //Extra kernel arguments
-    float speedMultiplier = 0.1f;
+    std::vector<Emitter> emitters =
+    {
+            StreamEmitter(hostParticleBuffer, 1000.0f),
+            PulseEmitter(hostParticleBuffer, 1000.0f, 1.0f)
+    };
+
+
+
+    startTime = std::chrono::high_resolution_clock::now();
+    endTime = std::chrono::high_resolution_clock::now() + std::chrono::seconds(30);
     
-
-    glm::vec3 hsv(1.0f, 1.0f, 1.0f);
-
-
     while (!glfwWindowShouldClose(window))
     {
         t0 = std::chrono::steady_clock::now();
-
+        
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
 
 
+        cursorScreenPosition = inputHandler.cursor_position();
+        cursorWorldPosition = cursor_to_world_position(inputHandler.cursor_position(), modelScale, viewOffset, windowDimensions);
+        scrollValue = inputHandler.scroll_direction();
+
+
+
         error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
-        if (mousePressedOnce)
+        if (inputHandler.is_key_pressed(MOVE_UP_INPUT)) viewOffset.y -= 0.01f * modelScale;
+        if (inputHandler.is_key_pressed(MOVE_LEFT_INPUT)) viewOffset.x += 0.01f * modelScale;
+        if (inputHandler.is_key_pressed(MOVE_DOWN_INPUT)) viewOffset.y += 0.01f * modelScale;
+        if (inputHandler.is_key_pressed(MOVE_RIGHT_INPUT)) viewOffset.x -= 0.01f * modelScale;
+
+        if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT))
         {
-            mousePressedOnce = false;
-            create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(mouseX, mouseY, 0.0f));
+            create_gravitor(hostGravitorBuffer, gravitorCount, cursorWorldPosition, 1.0f);
             glBindVertexArray(GRAV_VAO);
             glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
             glBufferSubData(GL_ARRAY_BUFFER, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data());
             error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
-            calculateGravity = !calculateGravity;
+        }
+        if (inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT))
+        {
+            create_gravitor(hostGravitorBuffer, gravitorCount, cursorWorldPosition, -1.0f);
+            glBindVertexArray(GRAV_VAO);
+            glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data());
+            error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
+        }
+        if (inputHandler.is_key_pressed_once(TOGGLE_MOVEMENT_INPUT)) calculateMovement = !calculateMovement;
+        if (inputHandler.is_key_pressed_once(TOGGLE_GRAVITY_INPUT)) calculateGravity = !calculateGravity;
+        if (inputHandler.is_key_pressed_once(INCREASE_POINT_SIZE_INPUT))
+        {
+            ++particleSize;
+        }
+        if (inputHandler.is_key_pressed_once(DECREASE_POINT_SIZE_INPUT))
+        {
+            --particleSize;
+            if (particleSize == 0) particleSize = 1;
+        }
+        if (scrollValue.y)
+        {
+            bool hueshiftKey = inputHandler.is_key_pressed(CHANGE_HUE_INPUT);
+            bool saturationshiftKey = inputHandler.is_key_pressed(CHANGE_SATURATION_INPUT);
+            bool valueshiftKey = inputHandler.is_key_pressed(CHANGE_VALUE_INPUT);
+
+            if (hueshiftKey)
+            {
+                hsv.x += scrollValue.y * deltaTime;
+                if (hsv.x > 1.0f) hsv.x = 0.0f;
+                if (hsv.x < 0.0f) hsv.x = 1.0f;
+            }
+            else if (saturationshiftKey)
+            {
+                hsv.y += scrollValue.y * deltaTime;
+                if (hsv.y > 1.0f) hsv.y = 1.0f;
+                if (hsv.y < 0.0f) hsv.y = 0.0f;
+            }
+            else if (valueshiftKey)
+            {
+                hsv.z += scrollValue.y * deltaTime;
+                if (hsv.z > 1.0f) hsv.z = 1.0f;
+                if (hsv.z < 0.0f) hsv.z = 0.0f;
+            }
+            else
+            {
+                adjust_model_scale(inputHandler.scroll_direction().y / 10.0f, modelScale);
+            }
         }
 
-        //error = clEnqueueReadBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
-        //remove_dead_particles(hostParticleBuffer, particleCount);
-        //generate_particles_st(hostParticleBuffer, particleCount, 10, _particle_generator_cone);
-        //error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
+        //for (auto& emitter : emitters) emitter.update(particleCount, deltaTime);
 
-        particlesPerUnit = particleCount / globalWorkSize;
-        particlesPerUnit++;
+        particlesPerWorkItem = particleCount / globalWorkSize;
+        particlesPerWorkItem++;
 
+        error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
 
-
-        if (calculateGravity && 0)
+        if (calculateGravity && calculateMovement)
         {
             error = clSetKernelArg(kernelGV, 1, sizeof(int), &particleCount);
             error = clSetKernelArg(kernelGV, 2, sizeof(cl_mem), &clGravitorBuffer);
             error = clSetKernelArg(kernelGV, 3, sizeof(int), &gravitorCount);
-            error = clSetKernelArg(kernelGV, 4, sizeof(int), &particlesPerUnit);
+            error = clSetKernelArg(kernelGV, 4, sizeof(int), &particlesPerWorkItem);
             error = clSetKernelArg(kernelGV, 5, sizeof(float), &deltaTime);
             error = clEnqueueNDRangeKernel(commandQueue, kernelGV, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
         }
-
-        error = clSetKernelArg(kernelMV, 1, sizeof(int), &particleCount);
-        error = clSetKernelArg(kernelMV, 2, sizeof(int), &particlesPerUnit);
-        error = clSetKernelArg(kernelMV, 3, sizeof(float), &deltaTime);
-        error = clEnqueueNDRangeKernel(commandQueue, kernelMV, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
+        if (calculateMovement)
+        {
+            error = clSetKernelArg(kernelMV, 1, sizeof(int), &particleCount);
+            error = clSetKernelArg(kernelMV, 2, sizeof(int), &particlesPerWorkItem);
+            error = clSetKernelArg(kernelMV, 3, sizeof(float), &deltaTime);
+            error = clEnqueueNDRangeKernel(commandQueue, kernelMV, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
+        }
 
         error = clFinish(commandQueue);
+        error = clEnqueueReadBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
         error = clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
 
 
         gravitorShader.use();
-        gravitorShader.setMat4("model", glm::scale(glm::mat4(1.0f), glm::vec3(MODELSCALE)));
+        gravitorShader.setMat4("model", glm::scale(glm::mat4(1.0f), glm::vec3(modelScale)));
+        gravitorShader.setMat4("view", glm::translate(glm::mat4(1.0f), viewOffset));
 
-        glPointSize(12);
+        glPointSize(6);
         glBindVertexArray(GRAV_VAO);
         glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
         glDrawArrays(GL_POINTS, 0, (GLsizei)gravitorCount);
@@ -229,11 +319,13 @@ int main()
 
 
         particleShader.use();
-        particleShader.setMat4("model", glm::scale(glm::mat4(1.0f), glm::vec3(MODELSCALE)));
+        particleShader.setMat4("model", glm::scale(glm::mat4(1.0f), glm::vec3(modelScale)));
+        particleShader.setMat4("view", glm::translate(glm::mat4(1.0f), viewOffset));
+        particleShader.setVec2("screenSize", windowDimensions);
+        particleShader.setFloat("modelScale", modelScale);
         particleShader.setVec3("hsv", hsv);
-        hsv.x += 0.001f;
 
-        glPointSize(1);
+        glPointSize((GLfloat)particleSize);
         glBindVertexArray(PART_VAO);
         glBindBuffer(GL_ARRAY_BUFFER, PART_VBO);
         glDrawArrays(GL_POINTS, 0, (GLsizei)particleCount);
@@ -242,13 +334,13 @@ int main()
 
         glFlush();
         glfwSwapBuffers(window);
-        glfwPollEvents();
+        inputHandler.update();
 
         t1 = std::chrono::steady_clock::now();
         deltaTime = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(t1 - t0).count() / 1000.0f;
         
-        totalPasses++;
-        if (t1 > stopTime) break;
+        updateCount++;
+        //if (t1 > stopTime) break;
     }
 
     glDeleteProgram(particleShader.ID);
@@ -264,9 +356,9 @@ int main()
 
     system("cls");
     std::cout << "  RESULTS\n" << "  ------------------------\n";
-    std::cout << "| Total updates: " << totalPasses << '\n';
+    std::cout << "| Total updates: " << updateCount << '\n';
     std::cout << "| Time elapsed: " << timeElapsed << '\n';
-    std::cout << "| Average updates per second: " << totalPasses / timeElapsed << '\n';
+    std::cout << "| Average updates per second: " << updateCount / timeElapsed << '\n';
 
 
 
