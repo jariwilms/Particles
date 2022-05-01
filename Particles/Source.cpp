@@ -1,4 +1,4 @@
-#include "Source.h"
+#include "Source.hpp"
 
 void create_gravitor(std::vector<Gravitor>& gravitors, size_t& gravitorCount, glm::vec2 position, float strength = 1.0f)
 {
@@ -34,6 +34,50 @@ glm::vec2 cursor_to_world_position(glm::vec2 cursorScreenPosition, float modelSc
         ( cursorScreenPosition.x * 2 / windowDimensions.x - viewOffset.x - 1.0f) / modelScale,
         (-cursorScreenPosition.y * 2 / windowDimensions.y - viewOffset.y + 1.0f) / modelScale);
 }
+void generatorTestFunc()
+{
+    std::vector<Particle> particles;
+    GeneratorSettings settings;
+    size_t particlesToGenerate = 0;
+    size_t particleCount = 0;
+
+    particles.resize(10000000);
+
+    std::chrono::high_resolution_clock::time_point t0;
+    std::chrono::high_resolution_clock::time_point t1;
+    float singleDelta = 0.0f;
+    float multiDelta = 0.0f;
+
+    for (int i = 0; i < 50; ++i) //1k => 10M
+    {
+        //particlesToGenerate = 1000 * (int)std::pow(10, i);
+        particlesToGenerate += 20000;
+        std::cout << "Generating " << particlesToGenerate << " particles\n";
+        
+        t0 = std::chrono::high_resolution_clock::now();
+        generate_particles_st(particles.data(), particleCount, particlesToGenerate, _particle_generator_uniform, settings);
+        t1 = std::chrono::high_resolution_clock::now();
+        singleDelta = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(t1 - t0).count() / 1000.0f;
+        std::cout << "ST TIME: " << singleDelta << '\n';
+
+        particleCount = 0;
+
+        t0 = std::chrono::high_resolution_clock::now();
+        generate_particles_mt(particles.data(), particleCount, particlesToGenerate, _particle_generator_uniform, settings);
+        t1 = std::chrono::high_resolution_clock::now();
+        multiDelta = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(t1 - t0).count() / 1000.0f;
+        std::cout << "MT TIME: " << multiDelta << "\n";
+
+        if (singleDelta < multiDelta)
+            std::cout << "Single thread was " << multiDelta - singleDelta << " seconds faster\n\n";
+        else
+            std::cout << "Multi thread was " << singleDelta - multiDelta << " seconds faster\n\n";
+
+        particleCount = 0;
+    }
+
+    exit(1);
+}
 
 int main()
 {
@@ -61,7 +105,7 @@ int main()
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
     size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
     size_t particlesPerWorkItem;                                                        //Amount of particles each work item will update
-    size_t initialParticles = 1000000;                                                   //Amount of particles to generate at the start of the simulation
+    size_t initialParticles = 3000000;                                                   //Amount of particles to generate at the start of the simulation
 
     std::vector<Gravitor> hostGravitorBuffer;                                           //Gravitor buffer of static size that remains on the host
     cl_mem clGravitorBuffer;                                                            //Pointer to GPU allocated gravitor buffer
@@ -195,17 +239,18 @@ int main()
     GeneratorSettings settings;
     settings.velocity_min = glm::vec3(2.0f, 0.0f, 0.0f);
     settings.velocity_max = glm::vec3(2.0f, 0.0f, 0.0f);
-    Emitter::GenerateOnce(hostParticleBuffer, particleCount, initialParticles, _particle_generator_uniform, settings);
+    Emitter::GenerateOnce(hostParticleBuffer.data(), particleCount, initialParticles, _particle_generator_uniform, settings);
+
     error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
     error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
     clFinish(commandQueue);
     error = clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
-    std::vector<Emitter> emitters =
-    {
-            StreamEmitter(hostParticleBuffer, 1000.0f),
-            PulseEmitter(hostParticleBuffer, 1000.0f, 1.0f)
-    };
+    std::vector<Emitter*> emitters;// =
+    //{
+    //        //new StreamEmitter(1000.0f),
+    //        new PulseEmitter(1000.0f, 1.0f)
+    //};
 
 
 
@@ -217,15 +262,14 @@ int main()
     
     while (!glfwWindowShouldClose(window))
     {
-        t0 = std::chrono::steady_clock::now();
+        t0 = std::chrono::high_resolution_clock::now();
         
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
 
-        
-        cursorScreenPosition = inputHandler.cursor_position();
-        cursorWorldPosition = cursor_to_world_position(inputHandler.cursor_position(), modelScale, viewOffset, windowDimensions);
+
+        inputHandler.update();
 
 
 
@@ -238,6 +282,7 @@ int main()
 
         if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT))
         {
+            cursorWorldPosition = cursor_to_world_position(inputHandler.cursor_position(), modelScale, viewOffset, windowDimensions);
             create_gravitor(hostGravitorBuffer, gravitorCount, cursorWorldPosition, 1.0f);
             glBindVertexArray(GRAV_VAO);
             glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
@@ -246,6 +291,7 @@ int main()
         }
         if (inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT))
         {
+            cursorWorldPosition = cursor_to_world_position(inputHandler.cursor_position(), modelScale, viewOffset, windowDimensions);
             create_gravitor(hostGravitorBuffer, gravitorCount, cursorWorldPosition, -1.0f);
             glBindVertexArray(GRAV_VAO);
             glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
@@ -295,15 +341,23 @@ int main()
             }
         }
 
-        if (calculateEnergy)
-        {
-            error = clSetKernelArg(kernelEN, 1, sizeof(int), &particleCount);
-            error = clSetKernelArg(kernelEN, 2, sizeof(int), &particlesPerWorkItem);
-            error = clSetKernelArg(kernelEN, 3, sizeof(float), &deltaTime);
-            error = clEnqueueNDRangeKernel(commandQueue, kernelEN, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
 
+
+        if (calculateEnergy || emitters.size() > 0)
+        {
             Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_READ_WRITE, 0, particleCount * sizeof(Particle), 0, nullptr, nullptr, &error);
-            remove_dead_particles(particles, particleCount);
+
+            if (calculateEnergy)
+            {
+                error = clSetKernelArg(kernelEN, 1, sizeof(int), &particleCount);
+                error = clSetKernelArg(kernelEN, 2, sizeof(int), &particlesPerWorkItem);
+                error = clSetKernelArg(kernelEN, 3, sizeof(float), &deltaTime);
+                error = clEnqueueNDRangeKernel(commandQueue, kernelEN, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
+
+                remove_dead_particles(particles, particleCount);
+            }
+            //if (emitters.size() > 0) for (auto& emitter : emitters) emitter->update(particles, particleCount, deltaTime);
+
             error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), particles, 0, nullptr, nullptr);
             error = clEnqueueUnmapMemObject(commandQueue, clParticleBuffer, particles, 0, nullptr, nullptr);
 
@@ -357,9 +411,8 @@ int main()
 
 
         glfwSwapBuffers(window);
-        inputHandler.update();
 
-        t1 = std::chrono::steady_clock::now();
+        t1 = std::chrono::high_resolution_clock::now();
         deltaTime = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(t1 - t0).count() / 1000.0f;
         
         updateCount++;

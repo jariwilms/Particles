@@ -4,15 +4,15 @@
 #include <random>
 #include <thread>
 
-#include "OpenCL.h"
+#include "OpenCL.hpp"
 
 #include "Particle.hpp"
 #include "GeneratorSettings.hpp"
 
-using ParticleGenerator = void(*)(std::vector<Particle>& particles, size_t particleCount, size_t amount, GeneratorSettings settings);
+using ParticleGenerator = void(*)(Particle* particles, size_t particleCount, size_t amount, GeneratorSettings settings);
 
-#define _P_GEN_SIG std::vector<Particle>& particles, size_t offset, size_t amount, GeneratorSettings settings
-#define GEN_SIG std::vector<Particle>& particles, size_t& particleCount, size_t amount, ParticleGenerator generator
+#define _P_GEN_SIG Particle* particles, size_t offset, size_t amount, GeneratorSettings settings
+#define GEN_SIG Particle* particles, size_t& particleCount, size_t amount, ParticleGenerator generator, GeneratorSettings settings
 // https://www.youtube.com/watch?v=UvZjzKOpdVM
 
 void _particle_generator_uniform(_P_GEN_SIG);

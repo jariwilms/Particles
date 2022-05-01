@@ -1,14 +1,14 @@
 #include "StreamEmitter.hpp"
 
-StreamEmitter::StreamEmitter(std::vector<Particle>& particles, float emissionRate)
-	: Emitter(particles, emissionRate)
+StreamEmitter::StreamEmitter(float emissionRate)
+	: Emitter(emissionRate)
 {
 	generator = _particle_generator_uniform;
 }
 
-void StreamEmitter::update(size_t& particleCount, float deltaTime)
+void StreamEmitter::update(Particle* particles, size_t& particleCount, float deltaTime)
 {
-	Emitter::update(particleCount, deltaTime);
+	m_deltaTime += deltaTime;
 
 	if (m_isEmitting)
 	{
@@ -21,7 +21,9 @@ void StreamEmitter::update(size_t& particleCount, float deltaTime)
 			m_deltaTime -= particlesToGenerate * deltaTimePerEmission;
 		}
 
-		generator(m_particles, particleCount, particlesToGenerate, settings);
+		if (particlesToGenerate < 20000) generate_particles_st(particles, particleCount, particlesToGenerate, generator, settings);
+		else generate_particles_mt(particles, particleCount, particlesToGenerate, generator, settings);
+
 		particleCount += particlesToGenerate;
 	}
 }

@@ -59,31 +59,28 @@
     <ClInclude Include="Shader.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Utils.h">
+    <ClInclude Include="Utils.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Particle.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ArrayObject.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Device.h">
+    <ClInclude Include="Device.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Gravitor.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="OpenCL.h">
+    <ClInclude Include="OpenCL.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="OpenGL.h">
+    <ClInclude Include="OpenGL.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Generators.h">
+    <ClInclude Include="Generators.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source.h">
+    <ClInclude Include="Source.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Emitter.hpp">

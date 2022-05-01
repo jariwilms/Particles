@@ -1,6 +1,6 @@
-#include "OpenCL.h"
+#include "OpenCL.hpp"
 
-size_t PARTICLE_BUFFER_SIZE = 1000000;
+size_t PARTICLE_BUFFER_SIZE = 10000000;
 size_t GRAVITOR_BUFFER_SIZE = 8;
 
 #define MAX_PLATFORM_ENTRIES 8

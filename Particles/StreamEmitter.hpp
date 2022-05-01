@@ -5,8 +5,8 @@
 class StreamEmitter : public Emitter
 {
 public:
-	StreamEmitter(std::vector<Particle>& particles, float emissionRate);
+	StreamEmitter(float emissionRate);
 
-	void update(size_t& particleCount, float deltaTime) override;
+	void update(Particle* particles, size_t& particleCount, float deltaTime) override;
 };
 

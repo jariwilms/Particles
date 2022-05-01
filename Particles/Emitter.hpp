@@ -8,7 +8,7 @@
 #include "GLM/glm.hpp"
 
 #include "Particle.hpp"
-#include "Generators.h"
+#include "Generators.hpp"
 #include "GeneratorSettings.hpp"
 
 class Emitter
@@ -19,20 +19,20 @@ public:
 
 	void set_emission_rate(float emissionRate);
 
-	virtual void update(size_t& particleCount, float deltaTime);
+	virtual void update(Particle* particles, size_t& particleCount, float deltaTime) = 0;
 
 	ParticleGenerator generator;
 	GeneratorSettings settings;
 
-	static void GenerateOnce(std::vector<Particle>& particles, size_t& particleCount, size_t amount, ParticleGenerator generator, GeneratorSettings settings);
+	static void GenerateOnce(Particle* particles, size_t& particleCount, size_t amount, ParticleGenerator generator, GeneratorSettings settings);
 
 protected:
-	Emitter(std::vector<Particle>& particles, float emissionRate);
+	Emitter(float emissionRate);
 
 	glm::vec3 m_position;
 	glm::vec3 m_velocity;
 
-	std::vector<Particle>& m_particles;
+	Particle* m_particles;
 
 	float m_emissionRate;
 	float m_deltaTime;

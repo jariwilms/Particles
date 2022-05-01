@@ -1,12 +1,12 @@
-#include "Generators.h"
+#include "Generators.hpp"
 
 #define RAND_F(min, max) (min + std::rand() / (RAND_MAX / (max - min)))
 
 extern size_t PARTICLE_BUFFER_SIZE;
 
-void _particle_generator_uniform(std::vector<Particle>& particles, size_t offset, size_t amount, GeneratorSettings settings)
+void _particle_generator_uniform(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
 {
-    std::srand(time((time_t*)nullptr));
+    std::srand((unsigned int)std::hash<std::thread::id>()(std::this_thread::get_id()));
 
     for (size_t i = 0; i < amount; i++)
     {
@@ -28,9 +28,9 @@ void _particle_generator_uniform(std::vector<Particle>& particles, size_t offset
         particles[offset + i] = Particle(glm::vec3(px, py, pz), glm::vec3(vx, vy, vz), glm::vec3(0.0f), glm::vec4(cr, cg, cb, ca), en);
     }
 }
-void _particle_generator_circle(std::vector<Particle>& particles, size_t offset, size_t amount, GeneratorSettings settings)
+void _particle_generator_circle(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
 {
-    std::srand(time((time_t*)nullptr));
+    std::srand((unsigned int)std::hash<std::thread::id>()(std::this_thread::get_id()));
 
     for (int i = 0; i < amount; i++)
     {
@@ -60,7 +60,7 @@ void _particle_generator_circle(std::vector<Particle>& particles, size_t offset,
         particles[offset + i] = Particle(glm::vec3(px, py, pz), glm::vec3(vx, vy, vz), glm::vec3(0.0f), glm::vec4(cr, cg, cb, ca), en);
     }
 }
-void _particle_generator_cone(std::vector<Particle>& particles, size_t offset, size_t amount)
+void _particle_generator_cone(Particle* particles, size_t offset, size_t amount)
 {
     std::random_device rd;
     std::default_random_engine generator(rd());
@@ -68,7 +68,6 @@ void _particle_generator_cone(std::vector<Particle>& particles, size_t offset, s
     std::uniform_real_distribution<float> angleDistribution(0.0f, 2 * (float)CL_M_PI);
     std::uniform_real_distribution<float> colorDistribution(0.0f, 1.0f);
     std::uniform_real_distribution<float> velocityDistribution(5.0f, 50.0f);
-    //std::uniform_real_distribution<float> accelerationDistribution(0.0f, -0.1f);
     std::uniform_real_distribution<float> lifeTimeDistribution(0.0f, 60.0f);
 
     glm::vec2 velocity;
@@ -91,37 +90,37 @@ void _particle_generator_cone(std::vector<Particle>& particles, size_t offset, s
     }
 }
 
-//void generate_particles_st(std::vector<Particle>& particles, size_t& particleCount, size_t amount, ParticleGenerator generator)
-//{
-//    if (particleCount + amount > PARTICLE_BUFFER_SIZE) amount = PARTICLE_BUFFER_SIZE - particleCount;
-//
-//    generator(particles, particleCount, amount);
-//    particleCount += amount;
-//}
-//void generate_particles_mt(std::vector<Particle>& particles, size_t& particleCount, size_t amount, ParticleGenerator generator)
-//{
-//    if (particleCount + amount > PARTICLE_BUFFER_SIZE) amount = PARTICLE_BUFFER_SIZE - particleCount;
-//
-//    constexpr auto THREAD_COUNT = 8;
-//    size_t particlesPerThread = amount / THREAD_COUNT;
-//    size_t particleRemainder = amount % THREAD_COUNT;
-//
-//    std::vector<std::thread> threads;
-//
-//    for (int i = 0; i < THREAD_COUNT; i++)
-//    {
-//        size_t offset = i * particlesPerThread + particleCount;
-//        threads.emplace_back([&, offset]() { generator(particles, offset, particlesPerThread); });
-//    }
-//
-//    if (particleRemainder)
-//    {
-//        size_t offset = THREAD_COUNT * particlesPerThread;
-//        generator(particles, offset, particleRemainder);
-//    }
-//
-//    for (auto& thread : threads)
-//        thread.join();
-//
-//    particleCount += amount;
-//}
+void generate_particles_st(Particle* particles, size_t& particleCount, size_t amount, ParticleGenerator generator, GeneratorSettings settings)
+{
+    //if (particleCount + amount > PARTICLE_BUFFER_SIZE) amount = PARTICLE_BUFFER_SIZE - particleCount;
+
+    generator(particles, particleCount, amount, settings);
+    particleCount += amount;
+}
+void generate_particles_mt(Particle* particles, size_t& particleCount, size_t amount, ParticleGenerator generator, GeneratorSettings settings)
+{
+    //if (particleCount + amount > PARTICLE_BUFFER_SIZE) amount = PARTICLE_BUFFER_SIZE - particleCount;
+
+    constexpr auto THREAD_COUNT = 8;
+    size_t particlesPerThread = amount / THREAD_COUNT;
+    size_t particleRemainder = amount % THREAD_COUNT;
+
+    std::vector<std::thread> threads;
+
+    for (int i = 0; i < THREAD_COUNT; i++)
+    {
+        size_t offset = i * particlesPerThread + particleCount;
+        threads.emplace_back([&, offset]() { generator(particles, offset, particlesPerThread, settings); });
+    }
+
+    if (particleRemainder)
+    {
+        size_t offset = THREAD_COUNT * particlesPerThread;
+        generator(particles, offset, particleRemainder, settings);
+    }
+
+    for (auto& thread : threads)
+        thread.join();
+
+    particleCount += amount;
+}
