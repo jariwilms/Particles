@@ -7,12 +7,18 @@ Emitter::Emitter(float emissionRate)
 	settings = GeneratorSettings{};
 }
 
+Emitter::Emitter(Particle* particles, float emissionRate)
+	: Emitter(emissionRate)
+{
+	m_particles = particles;
+}
+
 void Emitter::GenerateOnce(Particle* particles, size_t& particleCount, size_t amount, ParticleGenerator generator, GeneratorSettings settings)
 {
 	size_t particlesToGenerate = (size_t)(particleCount + amount > 10000000 ? 10000000 - particleCount : amount); //change to constant max size
 
-	generator(particles, particleCount, particlesToGenerate, settings);
-	particleCount += particlesToGenerate;
+	if (particlesToGenerate < 20000) generate_particles_st(particles, particleCount, particlesToGenerate, generator, settings);
+	else generate_particles_mt(particles, particleCount, particlesToGenerate, generator, settings);
 }
 
 void Emitter::resume()
@@ -27,5 +33,10 @@ void Emitter::pause()
 void Emitter::set_emission_rate(float emissionRate)
 {
 	m_emissionRate = emissionRate;
+}
+
+void Emitter::bind(Particle* particles)
+{
+	m_particles = particles;
 }
 

@@ -1,12 +1,6 @@
 #include "StreamEmitter.hpp"
 
-StreamEmitter::StreamEmitter(float emissionRate)
-	: Emitter(emissionRate)
-{
-	generator = _particle_generator_uniform;
-}
-
-void StreamEmitter::update(Particle* particles, size_t& particleCount, float deltaTime)
+void StreamEmitter::update(size_t& particleCount, float deltaTime)
 {
 	m_deltaTime += deltaTime;
 
@@ -21,8 +15,8 @@ void StreamEmitter::update(Particle* particles, size_t& particleCount, float del
 			m_deltaTime -= particlesToGenerate * deltaTimePerEmission;
 		}
 
-		if (particlesToGenerate < 20000) generate_particles_st(particles, particleCount, particlesToGenerate, generator, settings);
-		else generate_particles_mt(particles, particleCount, particlesToGenerate, generator, settings);
+		if (particlesToGenerate < 20000) generate_particles_st(m_particles, particleCount, particlesToGenerate, generator, settings);
+		else generate_particles_mt(m_particles, particleCount, particlesToGenerate, generator, settings);
 
 		particleCount += particlesToGenerate;
 	}
