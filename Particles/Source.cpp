@@ -133,7 +133,7 @@ int main()
 
     bool calculateMovement = true;                                                      //Should movement be calculated every update?
     bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
-    bool calculateEnergy = true;                                                       //Should energy be calculated every update?
+    bool calculateEnergy = false;                                                       //Should energy be calculated every update?
 
     glm::vec3 hsv(0.0f, 0.0f, 0.0f);
     glm::vec2 cursorScreenPosition{};                                                   //The on-screen position of the cursor
@@ -342,6 +342,9 @@ int main()
 
         if (calculateEnergy)
         {
+            //size_t count = 0;
+            //for (auto& emitter : emitters) count += emitter->gen_count(deltaTime);
+
             Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_READ_WRITE, 0, particleCount * sizeof(Particle), 0, nullptr, nullptr, &error);
             remove_dead_particles(particles, particleCount);
             error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), particles, 0, nullptr, nullptr);
@@ -354,6 +357,7 @@ int main()
             //    emitter->bind(particles);
             //    emitter->update(particleCount, deltaTime);
             //}
+            //std::cout << count << " particles were to be emitted\n";
 
             error = clSetKernelArg(kernelEN, 1, sizeof(int), &particleCount);
             error = clSetKernelArg(kernelEN, 2, sizeof(float), &deltaTime);

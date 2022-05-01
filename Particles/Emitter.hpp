@@ -20,6 +20,7 @@ public:
 	void resume();
 	void pause();
 
+	virtual size_t gen_count(float deltaTime) = 0;
 	void set_emission_rate(float emissionRate);
 
 	void bind(Particle* particles);

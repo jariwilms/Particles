@@ -1,5 +1,13 @@
 #include "StreamEmitter.hpp"
 
+size_t StreamEmitter::gen_count(float deltaTime)
+{
+	float deltaTimePerEmission = 1.0f / m_emissionRate;
+
+	if (m_deltaTime > deltaTimePerEmission) return (int)(m_deltaTime / deltaTimePerEmission);
+	else return 0;
+}
+
 void StreamEmitter::update(size_t& particleCount, float deltaTime)
 {
 	m_deltaTime += deltaTime;

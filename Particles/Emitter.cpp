@@ -32,7 +32,7 @@ void Emitter::pause()
 
 void Emitter::set_emission_rate(float emissionRate)
 {
-	m_emissionRate = emissionRate;
+	if (emissionRate > 0.0f) m_emissionRate = emissionRate;
 }
 
 void Emitter::bind(Particle* particles)
