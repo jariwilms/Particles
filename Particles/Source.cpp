@@ -105,7 +105,7 @@ int main()
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
     size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
     size_t particlesPerWorkItem;                                                        //Amount of particles each work item will update
-    size_t initialParticles = 3000000;                                                   //Amount of particles to generate at the start of the simulation
+    size_t initialParticles = 1000000;                                                  //Amount of particles to generate at the start of the simulation
 
     std::vector<Gravitor> hostGravitorBuffer;                                           //Gravitor buffer of static size that remains on the host
     cl_mem clGravitorBuffer;                                                            //Pointer to GPU allocated gravitor buffer
@@ -179,7 +179,7 @@ int main()
     glBufferSubData(GL_ARRAY_BUFFER, 0, particleCount * sizeof(Particle), hostParticleBuffer.data());
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), nullptr);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Particle), (void*)(9 * sizeof(float)));
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Particle), (void*)(2 * sizeof(glm::vec3)));
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
 
@@ -260,16 +260,21 @@ int main()
     startTime = std::chrono::high_resolution_clock::now();
     endTime = std::chrono::high_resolution_clock::now() + std::chrono::seconds(30);
     
+
+
+
+
+
+
+
+
     while (!glfwWindowShouldClose(window))
     {
+        inputHandler.update();
         t0 = std::chrono::high_resolution_clock::now();
         
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
-
-
-
-        inputHandler.update();
 
 
 
@@ -410,6 +415,7 @@ int main()
 
 
 
+        glFinish();
         glfwSwapBuffers(window);
 
         t1 = std::chrono::high_resolution_clock::now();

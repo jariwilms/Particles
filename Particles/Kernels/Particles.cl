@@ -8,18 +8,12 @@ typedef struct __attribute__ ((packed)) Particle
 	float vy;
 	float vz;
 
-	float ax;	
-	float ay;
-	float az;
-
 	float cr;	
 	float cg;
 	float cb;
 	float ca;
 
 	float en;
-
-	float2 padding;
 } Particle;
 
 typedef struct __attribute__ ((packed)) Gravitor
@@ -57,14 +51,8 @@ __kernel void calculate_movement(__global Particle* particles, int particleCount
 
 	for (int i = 0; i < ParticlesPerWorkItem; ++i)
 	{
-		particles[index].vx += particles[index].ax * deltaTime;
-		particles[index].vy += particles[index].ay * deltaTime;
-
 		particles[index].px += particles[index].vx * deltaTime;
 		particles[index].py += particles[index].vy * deltaTime;
-
-		particles[index].ax = 0.0f;
-		particles[index].ay = 0.0f;
 
 		++index;
 	}
@@ -110,10 +98,8 @@ __kernel void calculate_gravity(__global Particle* particles, int particleCount,
 	
 			inv_r = rsqrt(dx * dx + dy * dy);
 	
-			float2 test = normalize((float2)(dx, dy));
-
-			particles[index].ax += gravitors[j].gv * inv_r * dx;
-			particles[index].ay += gravitors[j].gv * inv_r * dy;
+			particles[index].vx += gravitors[j].gv * inv_r * dx * deltaTime;
+			particles[index].vy += gravitors[j].gv * inv_r * dy * deltaTime;
 		}
 	
 		++index;

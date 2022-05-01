@@ -25,7 +25,7 @@ void _particle_generator_uniform(Particle* particles, size_t offset, size_t amou
 
         float en = RAND_F(settings.energy_min, settings.energy_max);
 
-        particles[offset + i] = Particle(glm::vec3(px, py, pz), glm::vec3(vx, vy, vz), glm::vec3(0.0f), glm::vec4(cr, cg, cb, ca), en);
+        particles[offset + i] = Particle(glm::vec3(px, py, pz), glm::vec3(vx, vy, vz), glm::vec4(cr, cg, cb, ca), en);
     }
 }
 void _particle_generator_circle(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
@@ -57,37 +57,36 @@ void _particle_generator_circle(Particle* particles, size_t offset, size_t amoun
 
         float en = RAND_F(settings.energy_min, settings.energy_max);
 
-        particles[offset + i] = Particle(glm::vec3(px, py, pz), glm::vec3(vx, vy, vz), glm::vec3(0.0f), glm::vec4(cr, cg, cb, ca), en);
+        particles[offset + i] = Particle(glm::vec3(px, py, pz), glm::vec3(vx, vy, vz), glm::vec4(cr, cg, cb, ca), en);
     }
 }
 void _particle_generator_cone(Particle* particles, size_t offset, size_t amount)
 {
-    std::random_device rd;
-    std::default_random_engine generator(rd());
-    std::uniform_real_distribution<float> positionDistribution(0.0f, 1.0f);
-    std::uniform_real_distribution<float> angleDistribution(0.0f, 2 * (float)CL_M_PI);
-    std::uniform_real_distribution<float> colorDistribution(0.0f, 1.0f);
-    std::uniform_real_distribution<float> velocityDistribution(5.0f, 50.0f);
-    std::uniform_real_distribution<float> lifeTimeDistribution(0.0f, 60.0f);
+    //std::random_device rd;
+    //std::default_random_engine generator(rd());
+    //std::uniform_real_distribution<float> positionDistribution(0.0f, 1.0f);
+    //std::uniform_real_distribution<float> angleDistribution(0.0f, 2 * (float)CL_M_PI);
+    //std::uniform_real_distribution<float> colorDistribution(0.0f, 1.0f);
+    //std::uniform_real_distribution<float> velocityDistribution(5.0f, 50.0f);
+    //std::uniform_real_distribution<float> lifeTimeDistribution(0.0f, 60.0f);
 
-    glm::vec2 velocity;
+    //glm::vec2 velocity;
 
-    for (int i = 0; i < amount; i++)
-    {
-        float angle = (90.0f - 0.0f) * positionDistribution(generator) + 0.0f;
-        angle = angle * (float)CL_M_PI / 180.0f;
-        velocity = glm::vec2(cos(angle), sin(angle));
+    //for (int i = 0; i < amount; i++)
+    //{
+    //    float angle = (90.0f - 0.0f) * positionDistribution(generator) + 0.0f;
+    //    angle = angle * (float)CL_M_PI / 180.0f;
+    //    velocity = glm::vec2(cos(angle), sin(angle));
 
-        particles[offset + i] = Particle(
-            glm::vec3(2.0f, 2.0f, 0.0f), 
-            glm::vec3(velocityDistribution(generator), velocityDistribution(generator), 0.0f),
-            glm::vec3(0.0f),
+    //    particles[offset + i] = Particle(
+    //        glm::vec3(2.0f, 2.0f, 0.0f), 
+    //        glm::vec3(velocityDistribution(generator), velocityDistribution(generator), 0.0f),
 
-            glm::vec4(colorDistribution(generator), 0.0f, colorDistribution(generator), 0.5f),
+    //        glm::vec4(colorDistribution(generator), 0.0f, colorDistribution(generator), 0.5f),
 
-            lifeTimeDistribution(generator)
-        );
-    }
+    //        lifeTimeDistribution(generator)
+    //    );
+    //}
 }
 
 void generate_particles_st(Particle* particles, size_t& particleCount, size_t amount, ParticleGenerator generator, GeneratorSettings settings)
