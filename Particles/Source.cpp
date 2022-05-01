@@ -82,6 +82,7 @@ void generatorTestFunc()
 int main()
 {
     cl_int error;								                                        //OpenCL error code return
+    cl_event profiler = nullptr;                                                        //Event for profiling kernel execution time
 
     cl_uint numPlatforms;                                                               //Number of platforms present on the host. Value from 1 to MAX_PLATFORM_ENTRIES
     cl_platform_id platformId;                                                          //Selected platform id
@@ -131,7 +132,7 @@ int main()
 
 
     bool calculateMovement = true;                                                      //Should movement be calculated every update?
-    bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
+    bool calculateGravity = false;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
     bool calculateEnergy = false;                                                       //Should energy be calculated every update?
 
     glm::vec3 hsv(0.0f, 0.0f, 0.0f);
@@ -262,12 +263,6 @@ int main()
     
 
 
-
-
-
-
-
-
     while (!glfwWindowShouldClose(window))
     {
         inputHandler.update();
@@ -346,8 +341,6 @@ int main()
             }
         }
 
-
-
         if (calculateEnergy || emitters.size() > 0)
         {
             Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_READ_WRITE, 0, particleCount * sizeof(Particle), 0, nullptr, nullptr, &error);
@@ -376,6 +369,15 @@ int main()
             error = clSetKernelArg(kernelGV, 4, sizeof(int), &particlesPerWorkItem);
             error = clSetKernelArg(kernelGV, 5, sizeof(float), &deltaTime);
             error = clEnqueueNDRangeKernel(commandQueue, kernelGV, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
+
+            //error = clEnqueueNDRangeKernel(commandQueue, kernelGV, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, &profiler);
+            
+            //clWaitForEvents(1, &profiler);
+            //cl_ulong start = 0, end = 0;
+            //clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, NULL);
+            //clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end, NULL);
+
+            //std::cout << "Gravity kernel time: " << end - start << '\n';
         }
         if (calculateMovement)
         {
@@ -383,6 +385,15 @@ int main()
             error = clSetKernelArg(kernelMV, 2, sizeof(int), &particlesPerWorkItem);
             error = clSetKernelArg(kernelMV, 3, sizeof(float), &deltaTime);
             error = clEnqueueNDRangeKernel(commandQueue, kernelMV, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
+
+            //error = clEnqueueNDRangeKernel(commandQueue, kernelMV, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, &profiler);
+
+            //clWaitForEvents(1, &profiler);
+            //cl_ulong start = 0, end = 0;
+            //clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, NULL);
+            //clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end, NULL);
+
+            //std::cout << "Movement kernel time: " << end - start << '\n';
         }
 
         error = clFinish(commandQueue);
@@ -396,7 +407,6 @@ int main()
 
         glPointSize(6);
         glBindVertexArray(GRAV_VAO);
-        glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
         glDrawArrays(GL_POINTS, 0, (GLsizei)gravitorCount);
 
 
@@ -410,7 +420,6 @@ int main()
 
         glPointSize((GLfloat)particleSize);
         glBindVertexArray(PART_VAO);
-        glBindBuffer(GL_ARRAY_BUFFER, PART_VBO);
         glDrawArrays(GL_POINTS, 0, (GLsizei)particleCount);
 
 
@@ -432,6 +441,8 @@ int main()
 
     glDeleteVertexArrays(1, &GRAV_VAO);
     glDeleteBuffers(1, &GRAV_VBO);
+
+
 
     auto now = std::chrono::high_resolution_clock::now();
     float timeElapsed = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(now - startTime).count() / 1000.0f;
