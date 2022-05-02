@@ -5,8 +5,8 @@ GeneratorSettings::GeneratorSettings()
 	position_min = glm::vec3(-1.0f, -1.0f, 0.0f);
 	position_max = glm::vec3(1.0f, 1.0f, 0.0f);
 
-	velocity_min = glm::vec3(-1.0f, -1.0f, 0.0f);
-	velocity_max = glm::vec3(1.0f, 1.0f, 0.0f);
+	velocity_min = glm::vec3(0.0f);
+	velocity_max = glm::vec3(0.0f);
 
 	color_min = glm::vec4(0.0f);
 	color_max = glm::vec4(1.0f);

@@ -1,3 +1,5 @@
+#define DEBUG 0
+
 #include "Source.hpp"
 
 void create_gravitor(std::vector<Gravitor>& gravitors, size_t& gravitorCount, glm::vec2 position, float strength = 1.0f)
@@ -94,19 +96,18 @@ int main()
     cl_command_queue commandQueue;                                                      //Queue for device commands
 
     cl_program program;                                                                 //Program that contains kernels
-    cl_kernel kernelMV;                                                                 //KERNEL: Calculates particle movement
-    cl_kernel kernelGV;                                                                 //KERNEL: Calculates particle gravity
-    cl_kernel kernelEN;                                                                 //KERNEL: Calculates particle energy
-    cl_kernel kernelDP;                                                                 //KERNEL: Removes dead particles
+    cl_kernel kernelMVS, kernelMVL = nullptr;                                           //KERNEL: Calculates particle movement
+    cl_kernel kernelGVS, kernelGVL = nullptr;                                           //KERNEL: Calculates particle gravity
+    cl_kernel kernelENS, kernelENL = nullptr;                                           //KERNEL: Calculates particle energy
 
-    size_t globalWorkSize;                                                              //Maximum amount of work groups supported by the GPU
-
+    size_t globalWorkSize[3];                                                           //Amount of work dimensions the kernels are divided in
 
 
-    std::vector<Particle> hostParticleBuffer;                                           //Particle buffer of static size that remains on the host => TODO: remove
+
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
     size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
     size_t initialParticles = 100000;                                                  //Amount of particles to generate at the start of the simulation
+    std::vector<Emitter*> emitters{};                                                   //Vector of particle emitters
 
     std::vector<Gravitor> hostGravitorBuffer;                                           //Gravitor buffer of static size that remains on the host
     cl_mem clGravitorBuffer;                                                            //Pointer to GPU allocated gravitor buffer
@@ -133,7 +134,7 @@ int main()
 
     bool calculateMovement = true;                                                      //Should movement be calculated every update?
     bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
-    bool calculateEnergy = false;                                                       //Should energy be calculated every update?
+    bool calculateEnergy = true;                                                       //Should energy be calculated every update?
 
     glm::vec3 hsv(0.0f, 0.0f, 0.0f);
     glm::vec2 cursorScreenPosition{};                                                   //The on-screen position of the cursor
@@ -160,17 +161,21 @@ int main()
     };
 
     context = clCreateContext(properties, numDevices, &deviceId, nullptr, nullptr, &error);
+
+#if DEBUG
+    commandQueue = clCreateCommandQueue(context, deviceId, CL_QUEUE_PROFILING_ENABLE, &error);
+#else
     commandQueue = clCreateCommandQueue(context, deviceId, NULL, &error);
-    //commandQueue = clCreateCommandQueue(context, deviceId, CL_QUEUE_PROFILING_ENABLE, &error);
+#endif
+
     clGetDeviceInfo(deviceId, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(globalWorkSize), &globalWorkSize, nullptr);
+    globalWorkSize[1] = (initialParticles / globalWorkSize[0]) + 1;
 
 
 
 
 
     //Create shared particle buffer
-    hostParticleBuffer.resize(PARTICLE_BUFFER_SIZE);
-
     unsigned int PART_VAO, PART_VBO;
     glGenVertexArrays(1, &PART_VAO);
     glBindVertexArray(PART_VAO);
@@ -178,7 +183,6 @@ int main()
     glGenBuffers(1, &PART_VBO);
     glBindBuffer(GL_ARRAY_BUFFER, PART_VBO);
     glBufferData(GL_ARRAY_BUFFER, PARTICLE_BUFFER_SIZE * sizeof(Particle), nullptr, GL_DYNAMIC_DRAW);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, particleCount * sizeof(Particle), hostParticleBuffer.data());
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), nullptr);
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Particle), (void*)(2 * sizeof(glm::vec3)));
@@ -194,9 +198,7 @@ int main()
     hostGravitorBuffer.resize(GRAVITOR_BUFFER_SIZE);
     create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f));
     clGravitorBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, GRAVITOR_BUFFER_SIZE * sizeof(Gravitor), nullptr, &error);
-    check_error(error, __LINE__);
     error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
-    check_error(error, __LINE__);
 
     unsigned int GRAV_VAO, GRAV_VBO;
     glGenVertexArrays(1, &GRAV_VAO);
@@ -224,40 +226,36 @@ int main()
     error = clBuildProgram(program, 1, &deviceId, NULL, NULL, NULL);
     check_program_compile_error(error, program, deviceId, __LINE__);
 
-    kernelMV = clCreateKernel(program, "calculate_movement", &error);
+    kernelMVS = clCreateKernel(program, "calculate_movement_single", &error);
     check_kernel_compile_error(error, program, deviceId, __LINE__);
-    kernelGV = clCreateKernel(program, "calculate_gravity", &error);
+    kernelGVS = clCreateKernel(program, "calculate_gravity_single", &error);
     check_kernel_compile_error(error, program, deviceId, __LINE__);
-    kernelEN = clCreateKernel(program, "calculate_energy", &error);
-    check_kernel_compile_error(error, program, deviceId, __LINE__);
-    kernelDP = clCreateKernel(program, "remove_dead_particles", &error);
+    kernelENS = clCreateKernel(program, "calculate_energy_single", &error);
     check_kernel_compile_error(error, program, deviceId, __LINE__);
 
-    error = clSetKernelArg(kernelMV, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
-    error = clSetKernelArg(kernelGV, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
-    error = clSetKernelArg(kernelGV, 2, sizeof(cl_mem), (void*)&clGravitorBuffer);
-    error = clSetKernelArg(kernelEN, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
-    error = clSetKernelArg(kernelDP, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
+    error = clSetKernelArg(kernelMVS, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
+    error = clSetKernelArg(kernelGVS, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
+    error = clSetKernelArg(kernelGVS, 2, sizeof(cl_mem), (void*)&clGravitorBuffer);
+    error = clSetKernelArg(kernelENS, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
+
+
 
 
 
     GeneratorSettings settings;
     settings.velocity_min = glm::vec3(2.0f, 0.0f, 0.0f);
     settings.velocity_max = glm::vec3(2.0f, 0.0f, 0.0f);
-    Emitter::GenerateOnce(hostParticleBuffer.data(), particleCount, initialParticles, _particle_generator_uniform, settings);
 
+    //Map GPU memory to a host pointer and generate an initial amount of particles
     error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
-    error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), hostParticleBuffer.data(), 0, nullptr, nullptr);
-    clFinish(commandQueue);
+    Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_WRITE_ONLY, 0, initialParticles * sizeof(Particle), 0, nullptr, nullptr, &error);
+    Emitter::GenerateOnce(particles, particleCount, initialParticles, _particle_generator_uniform, settings);
+    clEnqueueUnmapMemObject(commandQueue, clParticleBuffer, particles, 0, nullptr, nullptr);
     error = clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
-    std::vector<Emitter*> emitters =
-    {
-            //new StreamEmitter(1000.0f),
-            new PulseEmitter(1000.0f, 1.0f)
-    };
 
 
+    emitters.push_back(new PulseEmitter(100.0f, 1.0f));
 
     startTime = std::chrono::high_resolution_clock::now();
     endTime = std::chrono::high_resolution_clock::now() + std::chrono::seconds(30);
@@ -342,57 +340,55 @@ int main()
 
         if (calculateEnergy)
         {
-            //size_t count = 0;
-            //for (auto& emitter : emitters) count += emitter->gen_count(deltaTime);
+            size_t count = 0;
+            for (auto& emitter : emitters) count += emitter->gen_count(deltaTime);
 
-            Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_READ_WRITE, 0, particleCount * sizeof(Particle), 0, nullptr, nullptr, &error);
+            Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_READ_WRITE, 0, (particleCount + count) * sizeof(Particle), 0, nullptr, nullptr, &error);
             remove_dead_particles(particles, particleCount);
-            error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, particleCount * sizeof(Particle), particles, 0, nullptr, nullptr);
+            for (auto emitter : emitters)
+            {
+                emitter->bind(particles);
+                emitter->update(particleCount, deltaTime);
+            }
+            error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, (particleCount) * sizeof(Particle), particles, 0, nullptr, nullptr);
             error = clEnqueueUnmapMemObject(commandQueue, clParticleBuffer, particles, 0, nullptr, nullptr);
 
-            //Problem: when mapping the buffer, (particleCount) amount of particles are copied. The emitter tries to generate new particles outside of the array bounds
-            //TODO: check how many particles are to be emitted, then add amount to copied particles
-            //for (auto& emitter : emitters)
-            //{
-            //    emitter->bind(particles);
-            //    emitter->update(particleCount, deltaTime);
-            //}
-            //std::cout << count << " particles were to be emitted\n";
+            globalWorkSize[1] = (particleCount / globalWorkSize[0]) + 1;
 
-            error = clSetKernelArg(kernelEN, 1, sizeof(int), &particleCount);
-            error = clSetKernelArg(kernelEN, 2, sizeof(float), &deltaTime);
-            error = clEnqueueNDRangeKernel(commandQueue, kernelEN, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
+            error = clSetKernelArg(kernelENS, 1, sizeof(int), &particleCount);
+            error = clSetKernelArg(kernelENS, 2, sizeof(float), &deltaTime);
+            error = clEnqueueNDRangeKernel(commandQueue, kernelENS, 2, nullptr, globalWorkSize, nullptr, 0, nullptr, nullptr);
         }
         if (calculateGravity && calculateMovement)
         {
-            error = clSetKernelArg(kernelGV, 1, sizeof(int), &particleCount);
-            error = clSetKernelArg(kernelGV, 3, sizeof(int), &gravitorCount);
-            error = clSetKernelArg(kernelGV, 4, sizeof(float), &deltaTime);
-            error = clEnqueueNDRangeKernel(commandQueue, kernelGV, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
-
-            //error = clEnqueueNDRangeKernel(commandQueue, kernelGV, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, &profiler);
-            //
-            //clWaitForEvents(1, &profiler);
-            //cl_ulong start = 0, end = 0;
-            //clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, NULL);
-            //clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end, NULL);
-
-            //std::cout << "Gravity kernel time: " << end - start << '\n';
+#if DEBUG
+            error = clEnqueueNDRangeKernel(commandQueue, kernelGVS, 2, nullptr, &globalWorkSize, nullptr, 0, nullptr, &profiler);
+            clWaitForEvents(1, &profiler);
+            cl_ulong start = 0, end = 0;
+            clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, NULL);
+            clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end, NULL);
+            std::cout << "Gravity kernel time: " << end - start << '\n';
+#else
+            error = clSetKernelArg(kernelGVS, 1, sizeof(int), &particleCount);
+            error = clSetKernelArg(kernelGVS, 3, sizeof(int), &gravitorCount);
+            error = clSetKernelArg(kernelGVS, 4, sizeof(float), &deltaTime);
+            error = clEnqueueNDRangeKernel(commandQueue, kernelGVS, 2, nullptr, globalWorkSize, nullptr, 0, nullptr, nullptr);
+#endif
         }
         if (calculateMovement)
         {
-            error = clSetKernelArg(kernelMV, 1, sizeof(int), &particleCount);
-            error = clSetKernelArg(kernelMV, 2, sizeof(float), &deltaTime);
-            error = clEnqueueNDRangeKernel(commandQueue, kernelMV, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, nullptr);
-
-            //error = clEnqueueNDRangeKernel(commandQueue, kernelMV, 1, nullptr, &globalWorkSize, nullptr, 0, nullptr, &profiler);
-
-            //clWaitForEvents(1, &profiler);
-            //cl_ulong start = 0, end = 0;
-            //clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, NULL);
-            //clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end, NULL);
-
-            //std::cout << "Movement kernel time: " << end - start << '\n';
+#if DEBUG
+            error = clEnqueueNDRangeKernel(commandQueue, kernelMVS, 2, nullptr, &globalWorkSize, nullptr, 0, nullptr, &profiler);
+            clWaitForEvents(1, &profiler);
+            cl_ulong start = 0, end = 0;
+            clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, NULL);
+            clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end, NULL);
+            std::cout << "Movement kernel time: " << end - start << '\n';
+#else
+            error = clSetKernelArg(kernelMVS, 1, sizeof(int), &particleCount);
+            error = clSetKernelArg(kernelMVS, 2, sizeof(float), &deltaTime);
+            error = clEnqueueNDRangeKernel(commandQueue, kernelMVS, 2, nullptr, globalWorkSize, nullptr, 0, nullptr, nullptr);
+#endif
         }
 
         error = clFinish(commandQueue);

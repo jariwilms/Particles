@@ -1,12 +1,13 @@
 #include "Generators.hpp"
 
+#define SEED_GENERATOR std::srand((unsigned int)time((time_t*)nullptr))
 #define RAND_F(min, max) (min + std::rand() / (RAND_MAX / (max - min)))
 
 extern size_t PARTICLE_BUFFER_SIZE;
 
 void _particle_generator_uniform(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
 {
-    std::srand((unsigned int)std::hash<std::thread::id>()(std::this_thread::get_id()));
+    SEED_GENERATOR;
 
     for (size_t i = 0; i < amount; i++)
     {
@@ -30,7 +31,7 @@ void _particle_generator_uniform(Particle* particles, size_t offset, size_t amou
 }
 void _particle_generator_circle(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
 {
-    std::srand((unsigned int)std::hash<std::thread::id>()(std::this_thread::get_id()));
+    SEED_GENERATOR;
 
     for (int i = 0; i < amount; i++)
     {

@@ -39,4 +39,3 @@ void Emitter::bind(Particle* particles)
 {
 	m_particles = particles;
 }
-

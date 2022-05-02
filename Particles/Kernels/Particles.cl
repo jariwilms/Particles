@@ -42,7 +42,13 @@ typedef struct Gravitor
 
 
 
-__kernel void calculate_movement(__global Particle* particles, int particleCount, float deltaTime)
+__kernel void calculate_movement_single(__global Particle* particles, int particleCount, float deltaTime)
+{
+	int index = get_global_id(0) + get_global_id(1) * get_global_size(0);
+	particles[index].px += particles[index].vx * deltaTime;
+	particles[index].py += particles[index].vy * deltaTime;
+}
+__kernel void calculate_movement_looped(__global Particle* particles, int particleCount, float deltaTime)
 {
 	int globalId = get_global_id(0);
 	int stride = get_global_size(0);
@@ -54,7 +60,25 @@ __kernel void calculate_movement(__global Particle* particles, int particleCount
 	}
 }
 
-__kernel void calculate_gravity(__global Particle* particles, int particleCount, __global Gravitor* gravitors, int gravitorCount, float deltaTime)
+__kernel void calculate_gravity_single(__global Particle* particles, int particleCount, __global Gravitor* gravitors, int gravitorCount, float deltaTime)
+{
+	int index = get_global_id(0) + get_global_id(1) * get_global_size(0);
+
+	float dx, dy;
+	float inv_r;
+
+	for (int j = 0; j < gravitorCount; ++j)
+	{
+		dx = gravitors[j].px - particles[index].px;
+		dy = gravitors[j].py - particles[index].py;
+
+		inv_r = rsqrt(dx * dx + dy * dy);
+
+		particles[index].vx += gravitors[j].gv * inv_r * dx * deltaTime;
+		particles[index].vy += gravitors[j].gv * inv_r * dy * deltaTime;
+	}
+}
+__kernel void calculate_gravity_looped(__global Particle* particles, int particleCount, __global Gravitor* gravitors, int gravitorCount, float deltaTime)
 {
 	int globalId = get_global_id(0);
 	int stride = get_global_size(0);
@@ -76,29 +100,14 @@ __kernel void calculate_gravity(__global Particle* particles, int particleCount,
 			particles[i].vy += gravitors[j].gv * inv_r * dy * deltaTime;
 		}
 	}
-
-	//for (int i = 0; i < ParticlesPerWorkItem; ++i)
-	//{
-	//	const int G = 1;
-	//	const int EARTH_MASS = 10;
-	//
-	//	for (int j = 0; j < gravitorCount; ++j)
-	//	{
-	//		float2 partPos = (float2)(particles[index].px, particles[index].py);
-	//		float2 gravPos = (float2)(gravitors[j].px, gravitors[j].py);
-	//
-	//		float2 r = partPos - gravPos;
-	//		float2 F = G * EARTH_MASS * normalize(r) / -pow(length(r), 2);
-	//
-	//		particles[index].vx += F.x * deltaTime;
-	//		particles[index].vy += F.y * deltaTime;
-	//	}
-	//
-	//	++index;
-	//}
 }
 
-__kernel void calculate_energy(__global Particle* particles, int particleCount, float deltaTime)
+__kernel void calculate_energy_single(__global Particle* particles, int particleCount, float deltaTime)
+{
+	int index = get_global_id(0) + get_global_id(1) * get_global_size(0);
+	particles[index].en -= deltaTime;
+}
+__kernel void calculate_energy_looped(__global Particle* particles, int particleCount, float deltaTime)
 {
 	int globalId = get_global_id(0);
 	int stride = get_global_size(0);
@@ -109,18 +118,38 @@ __kernel void calculate_energy(__global Particle* particles, int particleCount, 
 	}
 }
 
-__kernel void remove_dead_particles(__global Particle* particles, __global int* particleCount)
-{
-	for (int i = *particleCount; i > 0; --i)
-	{
-		if (particles[i - 1].en > 0.0f) continue;
+//Alternative gravity simulation, gives a different effect
+//for (int i = globalId; i < particleCount; i += stride)
+//{
+//	const int G = 1;
+//	const int EARTH_MASS = 10;
+//
+//	for (int j = 0; j < gravitorCount; ++j)
+//	{
+//		float2 partPos = (float2)(particles[i].px, particles[i].py);
+//		float2 gravPos = (float2)(gravitors[j].px, gravitors[j].py);
+//
+//		float2 r = partPos - gravPos;
+//		float2 F = G * EARTH_MASS * normalize(r) / -pow(length(r), 2);
+//
+//		particles[i].vx += F.x * deltaTime;
+//		particles[i].vy += F.y * deltaTime;
+//	}
+//}
 
-		particles[i - 1] = particles[*particleCount - 1];
-		*particleCount -= 1;
-	}
-}
+//DEPRECATED || transferring the particle array and computing it on the cpu is a lot faster
+//__kernel void remove_dead_particles(__global Particle* particles, __global int* particleCount)
+//{
+//	for (int i = *particleCount; i > 0; --i)
+//	{
+//		if (particles[i - 1].en > 0.0f) continue;
+//
+//		particles[i - 1] = particles[*particleCount - 1];
+//		*particleCount -= 1;
+//	}
+//}
 
-//Deprecated, settings HSV in fragment shader is an order of magnitude or 2 faster apparently...
+//DEPRECATED || settings HSV in fragment shader is an order of magnitude or 2 faster apparently...
 //__kernel void calculate_color_over_time(__global Particle* particles, int particleCount, int ParticlesPerWorkItem, float deltaTime, float speedMultiplier)
 //{
 //	SETUP;
