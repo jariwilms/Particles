@@ -1,4 +1,4 @@
-#version 330 core
+#version 460 core
 
 uniform mat4 model;
 uniform mat4 view;
@@ -13,6 +13,7 @@ out float distanceFromCenter;
 void main()
 {
 	gl_Position = view * model * vec4(position, 1.0);
-	distanceFromCenter = length(position.xy / screenSize - vec2(0));
+
+	distanceFromCenter = length(position.xy / screenSize);
 	vertexColor = color;
 }

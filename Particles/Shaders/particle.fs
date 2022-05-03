@@ -1,12 +1,13 @@
-#version 330 core
+#version 460 core
 
 uniform vec3 hsv;
 uniform vec2 screenSize;
 uniform float modelScale;
 
 in vec4 vertexColor;
+//in float distanceFromCenter;
 
-in float distanceFromCenter;
+out vec4 color;
 
 vec3 rgb_to_hsv(vec3 c)
 {
@@ -28,10 +29,17 @@ vec3 hsv_to_rgb(vec3 c)
 
 void main()
 {
+    vec2 normalizedCoordinate = gl_FragCoord.xy / screenSize;
+    float distanceFromCenter = distance(normalizedCoordinate, vec2(0.5)) + 0.3;
+
+    vec3 centerColor = vec3(1.0, 0.0, 1.0);
+    vec3 borderColor = vec3(0.0, 1.0, 1.0);
+
     vec3 original = rgb_to_hsv(vertexColor.xyz);
     vec3 modified = hsv_to_rgb(original + hsv);
 
-//    gl_FragColor = vec4(modified, vertexColor.a);                                                                  //particle color + hsv
-    gl_FragColor = vec4(vec2(gl_FragCoord.xy / screenSize), gl_FragCoord.z, 1.0);                                  //color depends on fragment coordinate
-//    fragmentColor = vec4(0.2, 0.5, 0.7, 0.5) + vec4(0.2, 0.3, 0.5, 0.5) * sqrt(distanceFromCenter);                 //color depends on distance from center
+//    color = vec4(modified, vertexColor.a);                                                                  //particle color + hsv
+//    color = vec4(vec2(gl_FragCoord.xy / screenSize), gl_FragCoord.z, 1.0);                                  //color depends on fragment coordinate
+//    color = vec4(0.2, 0.5, 0.7, 0.5) + vec4(0.2, 0.3, 0.5, 0.5) * sqrt(distanceFromCenter);                 //color depends on distance from center
+    color = vec4((distanceFromCenter) * centerColor + ((1 - distanceFromCenter) * borderColor), 0.8);
 } 

@@ -105,7 +105,7 @@ int main()
 
 
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
-    size_t initialParticles = 3000000;                                                  //Amount of particles to generate at the start of the simulation
+    size_t initialParticles = 1000000;                                                  //Amount of particles to generate at the start of the simulation
     size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
 
     std::vector<Gravitor> hostGravitorBuffer;                                           //Gravitor buffer of static size that remains on the host
@@ -247,6 +247,8 @@ int main()
     GeneratorSettings settings;
     settings.velocity_min = glm::vec3(2.0f, 0.0f, 0.0f);
     settings.velocity_max = glm::vec3(2.0f, 0.0f, 0.0f);
+    settings.color_max = glm::vec4(0.0f, 0.8f, 0.5f, 0.2f);
+    settings.color_min = glm::vec4(0.0f, 0.2f, 0.1f, 0.2f);
 
     //Map GPU memory to a host pointer and generate an initial amount of particles
     error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
@@ -326,13 +328,13 @@ int main()
             {
                 hsv.y += scrollValue.y * deltaTime;
                 if (hsv.y > 1.0f) hsv.y = 1.0f;
-                if (hsv.y < 0.0f) hsv.y = 0.0f;
+                if (hsv.y < -1.0f) hsv.y = -1.0f;
             }
             else if (valueshiftKey)
             {
                 hsv.z += scrollValue.y * deltaTime;
                 if (hsv.z > 1.0f) hsv.z = 1.0f;
-                if (hsv.z < 0.0f) hsv.z = 0.0f;
+                if (hsv.z < -1.0f) hsv.z = -1.0f;
             }
             else
             {

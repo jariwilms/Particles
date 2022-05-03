@@ -12,7 +12,7 @@ GeneratorSettings::GeneratorSettings()
 	color_max = glm::vec4(1.0f);
 
 	energy_min = 1.0f;
-	energy_max = 10.0f;
+	energy_max = 30.0f;
 
 	angle_min = 0.0f;
 	angle_max = 90.0f;
