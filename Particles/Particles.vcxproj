@@ -160,7 +160,6 @@
     <ClInclude Include="Generators.hpp" />
     <ClInclude Include="GeneratorSettings.hpp" />
     <ClInclude Include="Gravitor.hpp" />
-    <ClInclude Include="Device.hpp" />
     <ClInclude Include="InputHandler.hpp" />
     <ClInclude Include="OpenCL.hpp" />
     <ClInclude Include="OpenGL.hpp" />

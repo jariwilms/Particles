@@ -24,6 +24,9 @@ public:
 	float energy_min;
 	float energy_max;
 
+	float angle_min;
+	float angle_max;
+
 	bool velocity_outward_from_emitter;
 };
 

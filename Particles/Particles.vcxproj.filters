@@ -65,9 +65,6 @@
     <ClInclude Include="Particle.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Device.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Gravitor.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -9,7 +9,7 @@ void create_gravitor(std::vector<Gravitor>& gravitors, size_t& gravitorCount, gl
     gravitors[indexToReplace] = Gravitor(glm::vec3(position, 0.0f), glm::vec3(0.0f), glm::vec4(1.0f), strength);
     
     if (gravitorCount < 8) ++gravitorCount;
-    indexToReplace = ++indexToReplace % GRAVITOR_BUFFER_SIZE;
+    indexToReplace = ++indexToReplace % gravitors.size();
 }
 void remove_dead_particles(Particle* particles, size_t& particleCount)
 {
@@ -105,13 +105,14 @@ int main()
 
 
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
-    size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
     size_t initialParticles = 3000000;                                                  //Amount of particles to generate at the start of the simulation
-    std::vector<Emitter*> emitters{};                                                   //Vector of particle emitters
+    size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
 
     std::vector<Gravitor> hostGravitorBuffer;                                           //Gravitor buffer of static size that remains on the host
     cl_mem clGravitorBuffer;                                                            //Pointer to GPU allocated gravitor buffer
     size_t gravitorCount{};                                                             //Amount of gravitors = > separate variable to prevent host / GPU buffer resizing (kinda useless because GRAVITOR_BUFFER_SIZE is 8
+
+    std::vector<Emitter*> emitters{};                                                   //Vector of particle emitters
 
 
 
@@ -439,10 +440,10 @@ int main()
 
     system("cls");
     std::cout << "  RESULTS\n" << "  ------------------------\n";
-    std::cout << "| INITIAL PARTICLES\t" << initialParticles << '\n';
-    std::cout << "| UPDATES\t\t" << updateCount << '\n';
-    std::cout << "| TIME ELAPSED\t\t" << timeElapsed << '\n';
-    std::cout << "| UPDATES/SECOND\t" << updateCount / timeElapsed << '\n';
+    std::cout << std::setw(24) << std::left << "| INITIAL PARTICLES" << initialParticles << '\n';
+    std::cout << std::setw(24) << std::left << "| UPDATES" << updateCount << '\n';
+    std::cout << std::setw(24) << std::left << "| TIME ELAPSED" << timeElapsed << '\n';
+    std::cout << std::setw(24) << std::left << "| UPDATES/SECOND" << updateCount / timeElapsed << '\n';
 
 
 

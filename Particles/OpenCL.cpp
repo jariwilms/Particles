@@ -1,13 +1,10 @@
 #include "OpenCL.hpp"
 
-size_t PARTICLE_BUFFER_SIZE = 10000000; //10M
-size_t GRAVITOR_BUFFER_SIZE = 8;
-
-#define MAX_PLATFORM_ENTRIES 8
-#define MAX_DEVICE_ENTRIES 16
+constexpr auto MAX_PLATFORM_ENTRIES = 8;
+constexpr auto MAX_DEVICE_ENTRIES = 16;
 
 //shared buffer for error logging
-#define BUFFER_SIZE 1024
+constexpr auto BUFFER_SIZE = 1024;
 char PARAM_BUFFER[BUFFER_SIZE];
 size_t ANSWER_SIZE;
 
@@ -159,17 +156,16 @@ cl_platform_id _select_platform()
     platform_id = platform_arr[answer - 1];
     return platform_id;
 }
-cl_device_id _select_device(cl_platform_id platform_id)
+cl_device_id _select_device(cl_platform_id platformId, cl_uint& numDevices)
 {
     unsigned int answer;
-    int device_type;
+    int deviceType;
 
     cl_int error;
 
-    cl_int device_info;
-    cl_uint num_devices;
-    cl_device_id device_arr[MAX_DEVICE_ENTRIES];
-    cl_device_id device_id;
+    cl_int deviceInfo;
+    cl_device_id devices[MAX_DEVICE_ENTRIES];
+    cl_device_id deviceId;
 
 
 
@@ -187,51 +183,64 @@ cl_device_id _select_device(cl_platform_id platform_id)
     switch (answer)
     {
     case 1:
-        device_type = CL_DEVICE_TYPE_CPU;
+        deviceType = CL_DEVICE_TYPE_CPU;
         break;
     case 2:
-        device_type = CL_DEVICE_TYPE_GPU;
+        deviceType = CL_DEVICE_TYPE_GPU;
         break;
     case 3:
-        device_type = CL_DEVICE_TYPE_ALL;
+        deviceType = CL_DEVICE_TYPE_ALL;
         break;
     default:
         exit(EXIT_FAILURE);
     }
 
-    error = clGetDeviceIDs(platform_id, device_type, MAX_DEVICE_ENTRIES, device_arr, &num_devices);
+    error = clGetDeviceIDs(platformId, deviceType, MAX_DEVICE_ENTRIES, devices, &numDevices);
     check_error(error, __LINE__);
 
 
 
     system("cls");
     std::cout << "Select a device" << "\n" << "-----------------\n";
-    for (size_t i = 0; i < num_devices; i++)
+    for (size_t i = 0; i < numDevices; i++)
     {
-        device_info = clGetDeviceInfo(device_arr[i], CL_DEVICE_NAME, BUFFER_SIZE, PARAM_BUFFER, &ANSWER_SIZE);
+        deviceInfo = clGetDeviceInfo(devices[i], CL_DEVICE_NAME, BUFFER_SIZE, PARAM_BUFFER, &ANSWER_SIZE);
         std::cout << i + 1 << ": " << PARAM_BUFFER << '\n';
     }
 
     std::cin >> answer;
 
-    if (answer < 1 || answer > num_devices)
+    if (answer < 1 || answer > numDevices)
     {
         std::cout << "\nInvalid device selected\n";
         exit(EXIT_FAILURE);
     }
 
-    device_id = device_arr[answer - 1];
-    return device_id;
+    deviceId = devices[answer - 1];
+    return deviceId;
 }
 
-void setup_cl()
+void setup_cl(cl_platform_id& platformId, cl_device_id& deviceId, cl_context& context, cl_command_queue& commandQueue)
 {
-    cl_platform_id platform_id;
-    cl_device_id device_id;
+    cl_int error;
+    cl_uint numDevices;
 
-    //cl_context context;
-    //cl_command_queue command_queue;
+    platformId = _select_platform();
+    deviceId = _select_device(platformId, numDevices);
 
-    platform_id = _select_platform();
-    device_id = _select_device(platform_id);
+    cl_context_properties properties[] =
+    {
+       CL_GL_CONTEXT_KHR, (cl_context_properties)wglGetCurrentContext(),
+       CL_WGL_HDC_KHR, (cl_context_properties)wglGetCurrentDC(),
+       CL_CONTEXT_PLATFORM, (cl_context_properties)platformId,
+       NULL
+    };
+
+    context = clCreateContext(properties, numDevices, &deviceId, nullptr, nullptr, &error);
+
+#if DEBUG
+    commandQueue = clCreateCommandQueue(context, deviceId, CL_QUEUE_PROFILING_ENABLE, &error);
+#else
+    commandQueue = clCreateCommandQueue(context, deviceId, NULL, &error);
+#endif
 }

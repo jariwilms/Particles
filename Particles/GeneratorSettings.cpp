@@ -14,6 +14,9 @@ GeneratorSettings::GeneratorSettings()
 	energy_min = 1.0f;
 	energy_max = 10.0f;
 
+	angle_min = 0.0f;
+	angle_max = 90.0f;
+
 	velocity_outward_from_emitter = false;
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <iomanip>
 #include <vector>
 #include <random>
 #include <cmath>
@@ -29,8 +30,8 @@
 #include "StreamEmitter.hpp"
 #include "PulseEmitter.hpp"
 
-extern size_t PARTICLE_BUFFER_SIZE;
-extern size_t GRAVITOR_BUFFER_SIZE;
+const size_t PARTICLE_BUFFER_SIZE = 10000000;
+const size_t GRAVITOR_BUFFER_SIZE = 8;
 
 #define MOVE_UP_INPUT GLFW_KEY_W
 #define MOVE_LEFT_INPUT GLFW_KEY_A
