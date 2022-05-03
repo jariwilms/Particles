@@ -2,8 +2,8 @@
 
 GeneratorSettings::GeneratorSettings()
 {
-	position_min = glm::vec3(-1.0f, -1.0f, 0.0f);
-	position_max = glm::vec3(1.0f, 1.0f, 0.0f);
+	position_min = glm::vec3(-1.0f, -1.0f, -1.0f);
+	position_max = glm::vec3(1.0f, 1.0f, 1.0f);
 
 	velocity_min = glm::vec3(0.0f);
 	velocity_max = glm::vec3(0.0f);
@@ -17,7 +17,7 @@ GeneratorSettings::GeneratorSettings()
 	angle_min = 0.0f;
 	angle_max = 90.0f;
 
-	velocity_outward_from_emitter = false;
+	velocity_outward_from_source = false;
 }
 
 void GeneratorSettings::set_position_dst(float min, float max)

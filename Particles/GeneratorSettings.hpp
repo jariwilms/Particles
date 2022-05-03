@@ -27,6 +27,6 @@ public:
 	float angle_min;
 	float angle_max;
 
-	bool velocity_outward_from_emitter;
+	bool velocity_outward_from_source;
 };
 

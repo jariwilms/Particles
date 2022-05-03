@@ -10,7 +10,7 @@ struct Particle
 	Particle(glm::vec3 position, glm::vec3 velocity, glm::vec4 color, float energy)
 		: position{ position }, color{ color }, velocity{ velocity }, energy{ energy }
 	{
-		pad1 = pad2 = pad3 = pad4 = pad5 = 0;
+		pad1 = pad2 = pad3 = pad4 = pad5 = 0.0f;
 	}
 	
 	glm::vec3 position;

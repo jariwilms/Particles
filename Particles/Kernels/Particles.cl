@@ -38,15 +38,23 @@ typedef struct Gravitor
 	float ca;
 
 	float gv;
+
+	float pad1;
+	float pad2;
+	float pad3;
+	float pad4;
+	float pad5;
 } Gravitor;
 
-
+//Functions with _single postfix run only a single calculation per kernel while _looped functions iterate over a set amount of particles.
+//Running more work dimensions over a single function grants a large speedup over the looped version
 
 __kernel void calculate_movement_single(__global Particle* particles, int particleCount, float deltaTime)
 {
 	int index = get_global_id(0) + get_global_id(1) * get_global_size(0);
 	particles[index].px += particles[index].vx * deltaTime;
 	particles[index].py += particles[index].vy * deltaTime;
+	particles[index].pz += particles[index].vz * deltaTime;
 }
 __kernel void calculate_movement_looped(__global Particle* particles, int particleCount, float deltaTime)
 {
@@ -64,18 +72,20 @@ __kernel void calculate_gravity_single(__global Particle* particles, int particl
 {
 	int index = get_global_id(0) + get_global_id(1) * get_global_size(0);
 
-	float dx, dy;
+	float dx, dy, dz;
 	float inv_r;
 
 	for (int j = 0; j < gravitorCount; ++j)
 	{
 		dx = gravitors[j].px - particles[index].px;
 		dy = gravitors[j].py - particles[index].py;
+		dz = gravitors[j].pz - particles[index].pz;
 
-		inv_r = rsqrt(dx * dx + dy * dy);
+		inv_r = rsqrt(dx * dx + dy * dy + dz * dz);
 
 		particles[index].vx += gravitors[j].gv * inv_r * dx * deltaTime;
 		particles[index].vy += gravitors[j].gv * inv_r * dy * deltaTime;
+		particles[index].vz += gravitors[j].gv * inv_r * dz * deltaTime;
 	}
 }
 __kernel void calculate_gravity_looped(__global Particle* particles, int particleCount, __global Gravitor* gravitors, int gravitorCount, float deltaTime)

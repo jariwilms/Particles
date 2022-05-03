@@ -19,7 +19,7 @@
 #include "GLM/gtc/matrix_transform.hpp"
 
 #include "Utils.hpp"
-#include "Shader.hpp"
+#include "Program.hpp"
 #include "Particle.hpp"
 #include "Gravitor.hpp"
 

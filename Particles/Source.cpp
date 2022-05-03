@@ -1,5 +1,3 @@
-#define DEBUG 0
-
 #include "Source.hpp"
 
 void create_gravitor(std::vector<Gravitor>& gravitors, size_t& gravitorCount, glm::vec2 position, float strength = 1.0f)
@@ -105,7 +103,7 @@ int main()
 
 
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
-    size_t initialParticles = 1000000;                                                  //Amount of particles to generate at the start of the simulation
+    size_t initialParticles = 100000;                                                  //Amount of particles to generate at the start of the simulation
     size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
 
     std::vector<Gravitor> hostGravitorBuffer;                                           //Gravitor buffer of static size that remains on the host
@@ -118,9 +116,10 @@ int main()
 
     glm::uvec2 windowDimensions(800);                                                   //Dimensions of viewport
     GLFWwindow* window = setup_gl(windowDimensions);                                    //OpenGL setup
+    //glm::vec3 camera(0.0f, 0.0f, 3.0f);
+    Program particleShader("Shaders/particle.vs", nullptr, "Shaders/particle.fs");      //Particle shader
+    Program gravitorShader("Shaders/gravitor.vs", nullptr, "Shaders/gravitor.fs");      //Gravitor shader
     InputHandler inputHandler(window);                                                  //InputHandler class
-    Shader particleShader("Shaders/particle.vs", "Shaders/particle.fs");                //Particle shader
-    Shader gravitorShader("Shaders/gravitor.vs", "Shaders/gravitor.fs");                //Gravitor shader
 
 
 
@@ -162,12 +161,7 @@ int main()
     };
 
     context = clCreateContext(properties, numDevices, &deviceId, nullptr, nullptr, &error);
-
-#if DEBUG
-    commandQueue = clCreateCommandQueue(context, deviceId, CL_QUEUE_PROFILING_ENABLE, &error);
-#else
     commandQueue = clCreateCommandQueue(context, deviceId, NULL, &error);
-#endif
 
     clGetDeviceInfo(deviceId, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(globalWorkSize), &globalWorkSize, nullptr);
     globalWorkSize[1] = (initialParticles / globalWorkSize[0]) + 1;
@@ -365,34 +359,16 @@ int main()
         }
         if (calculateGravity && calculateMovement)
         {
-#if DEBUG
-            error = clEnqueueNDRangeKernel(commandQueue, kernelGVS, 2, nullptr, &globalWorkSize, nullptr, 0, nullptr, &profiler);
-            clWaitForEvents(1, &profiler);
-            cl_ulong start = 0, end = 0;
-            clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, NULL);
-            clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end, NULL);
-            std::cout << "Gravity kernel time: " << end - start << '\n';
-#else
             error = clSetKernelArg(kernelGV, 1, sizeof(int), &particleCount);
             error = clSetKernelArg(kernelGV, 3, sizeof(int), &gravitorCount);
             error = clSetKernelArg(kernelGV, 4, sizeof(float), &deltaTime);
             error = clEnqueueNDRangeKernel(commandQueue, kernelGV, 2, nullptr, globalWorkSize, nullptr, 0, nullptr, nullptr);
-#endif
         }
         if (calculateMovement)
         {
-#if DEBUG
-            error = clEnqueueNDRangeKernel(commandQueue, kernelMVS, 2, nullptr, &globalWorkSize, nullptr, 0, nullptr, &profiler);
-            clWaitForEvents(1, &profiler);
-            cl_ulong start = 0, end = 0;
-            clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, NULL);
-            clGetEventProfilingInfo(profiler, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end, NULL);
-            std::cout << "Movement kernel time: " << end - start << '\n';
-#else
             error = clSetKernelArg(kernelMV, 1, sizeof(int), &particleCount);
             error = clSetKernelArg(kernelMV, 2, sizeof(float), &deltaTime);
             error = clEnqueueNDRangeKernel(commandQueue, kernelMV, 2, nullptr, globalWorkSize, nullptr, 0, nullptr, nullptr);
-#endif
         }
 
         error = clFinish(commandQueue);
