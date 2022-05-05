@@ -29,12 +29,12 @@ void _particle_generator_uniform(Particle* particles, size_t offset, size_t amou
         particles[offset + i] = Particle(glm::vec3(px, py, pz), glm::vec3(vx, vy, vz), glm::vec4(cr, cg, cb, ca), en);
     }
 }
-void _particle_generator_circle(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
+void _particle_generator_sphere(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
 {
     SEED_GENERATOR;
 
-    float rx, ry, rz;
-    float tx, ty, tz;
+    float theta, phi;
+    float rx;// , ry, rz;
 
     float px, py, pz;
     float vx, vy, vz;
@@ -43,17 +43,13 @@ void _particle_generator_circle(Particle* particles, size_t offset, size_t amoun
 
     for (int i = 0; i < amount; i++)
     {
-        rx = RAND_F(settings.position_min.x, settings.position_max.x);
-        ry = RAND_F(settings.position_min.y, settings.position_max.y);
-        rz = RAND_F(settings.position_min.z, settings.position_max.z);
+        theta = RAND_F(0.0f, 2 * (float)M_PI);
+        phi = acosf(2 * RAND_F(0.0f, 1.0f) - 1);
+        rx = pow(RAND_F(0.0f, 1.0f), 1.0f / 3.0f);
 
-        tx = RAND_F(settings.position_min.x, settings.position_max.x) * 2 * float(CL_M_PI);
-        ty = RAND_F(settings.position_min.y, settings.position_max.y) * 2 * float(CL_M_PI);
-        tz = RAND_F(settings.position_min.z, settings.position_max.z) * 2 * float(CL_M_PI);
-
-        px = rx * cos(tx);
-        py = ry * sin(ty);
-        pz = rz * cos(tz);
+        px = rx * sinf(phi) * cosf(theta);
+        py = rx * sinf(phi) * sinf(theta);
+        pz = rx * cosf(phi);
 
         vx = RAND_F(settings.velocity_min.x, settings.velocity_max.x);
         vy = RAND_F(settings.velocity_min.y, settings.velocity_max.y);

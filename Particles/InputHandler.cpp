@@ -14,15 +14,13 @@ InputHandler::InputHandler(GLFWwindow* window)
 	glfwSetWindowUserPointer(m_window, this);
 
 	auto key_func = [](GLFWwindow* window, int key, int scancode, int action, int mods) { static_cast<InputHandler*>(glfwGetWindowUserPointer(window))->key_callback(window, key, scancode, action, mods); };
-	glfwSetKeyCallback(m_window, key_func);
-
-	auto position_func = [](GLFWwindow* window, double x, double y) { static_cast<InputHandler*>(glfwGetWindowUserPointer(window))->position_callback(window, x, y); };
-	glfwSetCursorPosCallback(m_window, position_func);
-
 	auto button_func = [](GLFWwindow* window, int button, int action, int mods) { static_cast<InputHandler*>(glfwGetWindowUserPointer(window))->button_callback(window, button, action, mods); };
-	glfwSetMouseButtonCallback(m_window, button_func);
-
+	auto position_func = [](GLFWwindow* window, double x, double y) { static_cast<InputHandler*>(glfwGetWindowUserPointer(window))->position_callback(window, x, y); };
 	auto scroll_func = [](GLFWwindow* window, double x, double y) { static_cast<InputHandler*>(glfwGetWindowUserPointer(window))->scroll_callback(window, x, y); };
+
+	glfwSetKeyCallback(m_window, key_func);
+	glfwSetMouseButtonCallback(m_window, button_func);
+	glfwSetCursorPosCallback(m_window, position_func);
 	glfwSetScrollCallback(m_window, scroll_func);
 }
 
@@ -56,19 +54,6 @@ bool InputHandler::is_key_pressed_once(int key) const
 	return m_activeKeys[key] && !m_lastActiveKeys[key];
 }
 
-bool InputHandler::is_moving_cursor() const
-{
-	return m_cursorPosition != m_lastCursorPosition;
-}
-bool InputHandler::is_moving_cursor_x() const
-{
-	return (m_cursorPosition - m_lastCursorPosition).x > 0;
-}
-bool InputHandler::is_moving_cursor_y() const
-{
-	return (m_cursorPosition - m_lastCursorPosition).y > 0;
-}
-
 bool InputHandler::is_any_button_pressed() const
 {
 	return m_activeButtonCount > 0;
@@ -80,6 +65,19 @@ bool InputHandler::is_button_pressed(int button) const
 bool InputHandler::is_button_pressed_once(int button) const
 {
 	return m_activeButtons[button] && !m_lastActiveButtons[button];
+}
+
+bool InputHandler::is_moving_cursor() const
+{
+	return m_cursorPosition != m_lastCursorPosition;
+}
+bool InputHandler::is_moving_cursor_x() const
+{
+	return (m_cursorPosition - m_lastCursorPosition).x > 0;
+}
+bool InputHandler::is_moving_cursor_y() const
+{
+	return (m_cursorPosition - m_lastCursorPosition).y > 0;
 }
 
 bool InputHandler::is_scrolling() const

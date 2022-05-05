@@ -26,13 +26,13 @@ public:
 	bool is_key_pressed(int key) const;
 	bool is_key_pressed_once(int key) const;
 
-	bool is_moving_cursor() const;
-	bool is_moving_cursor_x() const;
-	bool is_moving_cursor_y() const;
-
 	bool is_any_button_pressed() const;
 	bool is_button_pressed(int button) const;
 	bool is_button_pressed_once(int button) const;
+
+	bool is_moving_cursor() const;
+	bool is_moving_cursor_x() const;
+	bool is_moving_cursor_y() const;
 
 	bool is_scrolling() const;
 	bool is_scrolling_x(int direction) const;
@@ -47,6 +47,7 @@ public:
 
 private:
 	GLFWwindow* m_window;
+
 	std::vector<bool> m_activeKeys;
 	std::vector<bool> m_lastActiveKeys;
 

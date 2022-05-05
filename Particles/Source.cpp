@@ -1,10 +1,10 @@
 #include "Source.hpp"
 
-void create_gravitor(std::vector<Gravitor>& gravitors, size_t& gravitorCount, glm::vec2 position, float strength = 1.0f)
+void create_gravitor(std::vector<Gravitor>& gravitors, size_t& gravitorCount, glm::vec3 position, float strength = 1.0f)
 {
     static size_t indexToReplace = 0;
 
-    gravitors[indexToReplace] = Gravitor(glm::vec3(position, 0.0f), glm::vec3(0.0f), glm::vec4(1.0f), strength);
+    gravitors[indexToReplace] = Gravitor(position, glm::vec3(0.0f), glm::vec4(1.0f), strength);
     
     if (gravitorCount < 8) ++gravitorCount;
     indexToReplace = ++indexToReplace % gravitors.size();
@@ -20,13 +20,6 @@ void remove_dead_particles(Particle* particles, size_t& particleCount)
         particles[i - 1] = particles[particleCount - 1];
         --particleCount;
     }
-}
-void adjust_model_scale(float value, float& modelScale)
-{
-    modelScale += value / 50.0f;
-
-    if (modelScale < 0.001f) modelScale = 0.001f;
-    if (modelScale > 1.0f) modelScale = 1.0f;
 }
 glm::vec2 cursor_to_world_position(glm::vec2 cursorScreenPosition, float modelScale, glm::vec3 viewOffset, glm::uvec2 windowDimensions)
 {
@@ -103,7 +96,7 @@ int main()
 
 
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
-    size_t initialParticles = 100000;                                                  //Amount of particles to generate at the start of the simulation
+    size_t initialParticles = 1000000;                                                  //Amount of particles to generate at the start of the simulation
     size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
 
     std::vector<Gravitor> hostGravitorBuffer;                                           //Gravitor buffer of static size that remains on the host
@@ -114,12 +107,23 @@ int main()
 
 
 
-    glm::uvec2 windowDimensions(800);                                                   //Dimensions of viewport
+    glm::vec2 windowDimensions(800);                                                   //Dimensions of viewport
     GLFWwindow* window = setup_gl(windowDimensions);                                    //OpenGL setup
-    //glm::vec3 camera(0.0f, 0.0f, 3.0f);
+
+    glm::vec3 cameraPosition{ 0.0f };                                                   //Position of the camera after rotation
+    float cameraDistance = 10.0f;                                                       //Distance from the origin the camera will rotate around
+
+    glm::mat4 modelMatrix{ 1.0f };                                                      //Converts local to global space
+    glm::mat4 viewMatrix{ 1.0f };                                                       //Converts global to view space
+    glm::mat4 projectionMatrix{ 1.0f };                                                 //Converts view to screen/clip space
+    glm::vec2 rotation{ 0.0f };                                                         //Current rotation of the camera around the origin
+    glm::mat4 rotationMatrix{ 1.0f };
+    float zoom{ 1.0f };
+
     Program particleShader("Shaders/particle.vs", nullptr, "Shaders/particle.fs");      //Particle shader
     Program gravitorShader("Shaders/gravitor.vs", nullptr, "Shaders/gravitor.fs");      //Gravitor shader
-    InputHandler inputHandler(window);                                                  //InputHandler class
+
+    InputHandler inputHandler(window);                                                  //Class that handles input events
 
 
 
@@ -136,15 +140,14 @@ int main()
     bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
     bool calculateEnergy = false;                                                       //Should energy be calculated every update?
 
-    glm::vec3 hsv(0.0f, 0.0f, 0.0f);
+    glm::vec3 hsv{};
     glm::vec2 cursorScreenPosition{};                                                   //The on-screen position of the cursor
-    glm::vec2 cursorWorldPosition{};                                                    //The modelScale adjusted world position
-    glm::vec2 scrollValue{};                                                            //The inputted scroll direction
+    glm::vec2 cursorWorldPosition{};                                                    //The modelMatrix adjusted world position
+    glm::vec2 scrollValue{};                                                            //The current scroll direction
 
     int particleSize = 1;                                                               //Size of particles
     float speedMultiplier = 0.1f;                                                       //Calculation speed modifier (works only on hue shifting atm)
-    float modelScale = 0.2f;                                                            //The zoom scale
-    glm::vec3 viewOffset(0.0f);                                                         //Camera position
+
 
 
 
@@ -192,7 +195,7 @@ int main()
 
     //Create shared gravitor buffer
     hostGravitorBuffer.resize(GRAVITOR_BUFFER_SIZE);
-    create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f));
+    create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f), 0.1f);
     clGravitorBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, GRAVITOR_BUFFER_SIZE * sizeof(Gravitor), nullptr, &error);
     error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
 
@@ -239,21 +242,22 @@ int main()
 
 
     GeneratorSettings settings;
-    settings.velocity_min = glm::vec3(2.0f, 0.0f, 0.0f);
-    settings.velocity_max = glm::vec3(2.0f, 0.0f, 0.0f);
     settings.color_max = glm::vec4(0.0f, 0.8f, 0.5f, 0.2f);
     settings.color_min = glm::vec4(0.0f, 0.2f, 0.1f, 0.2f);
 
     //Map GPU memory to a host pointer and generate an initial amount of particles
     error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
     Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_WRITE_ONLY, 0, initialParticles * sizeof(Particle), 0, nullptr, nullptr, &error);
-    Emitter::GenerateOnce(particles, particleCount, initialParticles, _particle_generator_uniform, settings);
+    Emitter::GenerateOnce(particles, particleCount, initialParticles, _particle_generator_sphere, settings);
     clEnqueueUnmapMemObject(commandQueue, clParticleBuffer, particles, 0, nullptr, nullptr);
     error = clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
 
 
-    //emitters.push_back(new PulseEmitter(100.0f, 1.0f));
+    //projectionMatrix = glm::perspective(glm::radians(15.0f), (float)windowDimensions.x / (float)windowDimensions.y, 0.1f, 100.0f);
+    projectionMatrix = glm::ortho(-1.0f, 1.0f, 1.0f, -1.0f, 0.1f, 10.0f);
+
+
 
     startTime = std::chrono::high_resolution_clock::now();
     endTime = std::chrono::high_resolution_clock::now() + std::chrono::seconds(30);
@@ -270,24 +274,32 @@ int main()
 
         error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
-        if (inputHandler.is_key_pressed(MOVE_UP_INPUT)) viewOffset.y -= 0.01f * modelScale;
-        if (inputHandler.is_key_pressed(MOVE_LEFT_INPUT)) viewOffset.x += 0.01f * modelScale;
-        if (inputHandler.is_key_pressed(MOVE_DOWN_INPUT)) viewOffset.y += 0.01f * modelScale;
-        if (inputHandler.is_key_pressed(MOVE_RIGHT_INPUT)) viewOffset.x -= 0.01f * modelScale;
+        if (inputHandler.is_key_pressed(MOVE_UP_INPUT)) rotation.y += 1.0f * deltaTime;
+        if (inputHandler.is_key_pressed(MOVE_LEFT_INPUT)) rotation.x -= 1.0f * deltaTime;
+        if (inputHandler.is_key_pressed(MOVE_DOWN_INPUT)) rotation.y -= 1.0f * deltaTime;
+        if (inputHandler.is_key_pressed(MOVE_RIGHT_INPUT)) rotation.x += 1.0f * deltaTime;
 
-        if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT))
+        rotationMatrix = glm::mat4(1.0f);
+        rotationMatrix = glm::rotate(rotationMatrix, rotation.x, glm::vec3(0.0f, 1.0f, 0.0f));
+        rotationMatrix = glm::rotate(rotationMatrix, rotation.y, glm::vec3(1.0f, 0.0f, 0.0f));
+        cameraPosition = glm::vec3(rotationMatrix * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+
+        viewMatrix = glm::lookAt(cameraPosition, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        viewMatrix = glm::scale(viewMatrix, glm::vec3(zoom));
+
+        if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT) || inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT))
         {
-            cursorWorldPosition = cursor_to_world_position(inputHandler.cursor_position(), modelScale, viewOffset, windowDimensions);
-            create_gravitor(hostGravitorBuffer, gravitorCount, cursorWorldPosition, 1.0f);
-            glBindVertexArray(GRAV_VAO);
-            glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data());
-            error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
-        }
-        if (inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT))
-        {
-            cursorWorldPosition = cursor_to_world_position(inputHandler.cursor_position(), modelScale, viewOffset, windowDimensions);
-            create_gravitor(hostGravitorBuffer, gravitorCount, cursorWorldPosition, -1.0f);
+            glm::vec2 pos = glm::vec2(inputHandler.cursor_position() / windowDimensions);
+            glm::vec2 absPos = glm::vec2(pos.x, -pos.y) + glm::vec2(-0.5f, 0.5f);
+            glm::vec4 rotPos = rotationMatrix * glm::vec4(absPos, 0.0f, 0.0f);
+            glm::vec4 wPos = projectionMatrix * viewMatrix * glm::vec4(rotPos);
+
+            //std::cout << "SCREEN\t[" << pos.x << ", " << pos.y << "]\n";
+            //std::cout << "ABS\t[" << absPos.x << ", " << absPos.y << "]\n";
+            //std::cout << "ROT\t[" << rotPos.x << ", " << rotPos.y << ", " << rotPos.z << "]\n";
+            //std::cout << "WORLD\t[" << wPos.x << ", " << wPos.y << ", " << wPos.z << "]\n\n";
+
+            create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(rotPos.x, -rotPos.y, rotPos.z) * 2.0f, 0.1f);
             glBindVertexArray(GRAV_VAO);
             glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
             glBufferSubData(GL_ARRAY_BUFFER, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data());
@@ -332,7 +344,9 @@ int main()
             }
             else
             {
-                adjust_model_scale(inputHandler.scroll_direction().y / 10.0f, modelScale);
+                zoom += scrollValue.y * 0.1f;
+                zoom = std::min(zoom, 100.0f);
+                zoom = std::max(zoom, 0.1f);
             }
         }
 
@@ -378,8 +392,9 @@ int main()
 
         //Draw gravitors
         gravitorShader.use();
-        gravitorShader.setMat4("model", glm::scale(glm::mat4(1.0f), glm::vec3(modelScale)));
-        gravitorShader.setMat4("view", glm::translate(glm::mat4(1.0f), viewOffset));
+        gravitorShader.setMat4("model", modelMatrix);
+        gravitorShader.setMat4("view", viewMatrix);
+        gravitorShader.setMat4("projection", projectionMatrix);
 
         glPointSize(6);
         glBindVertexArray(GRAV_VAO);
@@ -389,10 +404,11 @@ int main()
 
         //Draw particles
         particleShader.use();
-        particleShader.setMat4("model", glm::scale(glm::mat4(1.0f), glm::vec3(modelScale)));
-        particleShader.setMat4("view", glm::translate(glm::mat4(1.0f), viewOffset));
+        particleShader.setMat4("model", modelMatrix);
+        particleShader.setMat4("view", viewMatrix);
+        particleShader.setMat4("projection", projectionMatrix);
+
         particleShader.setVec2("screenSize", windowDimensions);
-        particleShader.setFloat("modelScale", modelScale);
         particleShader.setVec3("hsv", hsv);
 
         glPointSize((GLfloat)particleSize);
@@ -408,7 +424,7 @@ int main()
         deltaTime = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(t1 - t0).count() / 1000.0f;
         
         ++updateCount;
-        if (t1 > endTime) break;
+        //if (t1 > endTime) break;
     }
 
 
