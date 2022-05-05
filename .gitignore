@@ -30,7 +30,7 @@
 *.exe
 *.out
 *.app
-/.vs/Particles/v17
+/.vs
 /Dependencies
 /Particles/x64
 /x64
