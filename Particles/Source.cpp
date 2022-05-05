@@ -106,7 +106,7 @@ int main()
 
 
 
-    glm::vec2 windowDimensions(800);                                                    //Dimensions of viewport
+    glm::vec2 windowDimensions{ 800 };                                                    //Dimensions of viewport
     GLFWwindow* window = setup_gl(windowDimensions);                                    //OpenGL setup
 
     glm::mat4 modelMatrix{ 1.0f };                                                      //Converts local to global space
@@ -247,7 +247,7 @@ int main()
 
 
 
-    glm::vec4 projectionDimensions(-1.0f, 1.0f, -1.0f, 1.0f);
+    glm::vec4 projectionDimensions{ -1.0f, 1.0f, -1.0f, 1.0f };
     projectionMatrix = glm::ortho(projectionDimensions.x, projectionDimensions.y, projectionDimensions.z, projectionDimensions.w, 0.01f, 10.0f);
 
     startTime = std::chrono::high_resolution_clock::now();
