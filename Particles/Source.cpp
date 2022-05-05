@@ -75,7 +75,6 @@ void generatorTestFunc()
 int main()
 {
     cl_int error;								                                        //OpenCL error code return
-    cl_event profiler = nullptr;                                                        //Event for profiling kernel execution time
 
     cl_uint numPlatforms;                                                               //Number of platforms present on the host. Value from 1 to MAX_PLATFORM_ENTRIES
     cl_platform_id platformId;                                                          //Selected platform id
@@ -107,23 +106,30 @@ int main()
 
 
 
-    glm::vec2 windowDimensions(800);                                                   //Dimensions of viewport
+    glm::vec2 windowDimensions(800);                                                    //Dimensions of viewport
     GLFWwindow* window = setup_gl(windowDimensions);                                    //OpenGL setup
-
-    glm::vec3 cameraPosition{ 0.0f };                                                   //Position of the camera after rotation
-    float cameraDistance = 10.0f;                                                       //Distance from the origin the camera will rotate around
 
     glm::mat4 modelMatrix{ 1.0f };                                                      //Converts local to global space
     glm::mat4 viewMatrix{ 1.0f };                                                       //Converts global to view space
     glm::mat4 projectionMatrix{ 1.0f };                                                 //Converts view to screen/clip space
+
     glm::vec2 rotation{ 0.0f };                                                         //Current rotation of the camera around the origin
-    glm::mat4 rotationMatrix{ 1.0f };
+    glm::vec3 cameraPosition{ 0.0f };                                                   //Position of the camera after rotation
     float zoom{ 1.0f };
 
     Program particleShader("Shaders/particle.vs", nullptr, "Shaders/particle.fs");      //Particle shader
     Program gravitorShader("Shaders/gravitor.vs", nullptr, "Shaders/gravitor.fs");      //Gravitor shader
 
     InputHandler inputHandler(window);                                                  //Class that handles input events
+
+
+
+    bool calculateMovement = true;                                                      //Should movement be calculated every update?
+    bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
+    bool calculateEnergy = false;                                                       //Should energy be calculated every update?
+
+    glm::vec3 hsv{};
+    int particleSize = 1;                                                               //Size of particles
 
 
 
@@ -134,19 +140,6 @@ int main()
     unsigned int updateCount{};                                                         //Total amount of updates the simulation has done
     float deltaTime{};                                                                  //Elapsed time between each update
 
-
-
-    bool calculateMovement = true;                                                      //Should movement be calculated every update?
-    bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
-    bool calculateEnergy = false;                                                       //Should energy be calculated every update?
-
-    glm::vec3 hsv{};
-    glm::vec2 cursorScreenPosition{};                                                   //The on-screen position of the cursor
-    glm::vec2 cursorWorldPosition{};                                                    //The modelMatrix adjusted world position
-    glm::vec2 scrollValue{};                                                            //The current scroll direction
-
-    int particleSize = 1;                                                               //Size of particles
-    float speedMultiplier = 0.1f;                                                       //Calculation speed modifier (works only on hue shifting atm)
 
 
 
@@ -254,10 +247,8 @@ int main()
 
 
 
-    //projectionMatrix = glm::perspective(glm::radians(15.0f), (float)windowDimensions.x / (float)windowDimensions.y, 0.1f, 100.0f);
-    projectionMatrix = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, 0.1f, 10.0f);
-
-
+    glm::vec4 projectionDimensions(-1.0f, 1.0f, -1.0f, 1.0f);
+    projectionMatrix = glm::ortho(projectionDimensions.x, projectionDimensions.y, projectionDimensions.z, projectionDimensions.w, 0.01f, 10.0f);
 
     startTime = std::chrono::high_resolution_clock::now();
     endTime = std::chrono::high_resolution_clock::now() + std::chrono::seconds(30);
@@ -274,12 +265,26 @@ int main()
 
         error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
-        if (inputHandler.is_key_pressed(MOVE_UP_INPUT)) rotation.y += 1.0f * deltaTime;
-        if (inputHandler.is_key_pressed(MOVE_LEFT_INPUT)) rotation.x -= 1.0f * deltaTime;
-        if (inputHandler.is_key_pressed(MOVE_DOWN_INPUT)) rotation.y -= 1.0f * deltaTime;
-        if (inputHandler.is_key_pressed(MOVE_RIGHT_INPUT)) rotation.x += 1.0f * deltaTime;
+        if (inputHandler.is_key_pressed(MOVE_UP_INPUT))
+        {
+            rotation.y += 1.0f * deltaTime;
+            rotation.y = std::min(rotation.y, CL_M_PI_2_F - 0.001f);
+        }
+        if (inputHandler.is_key_pressed(MOVE_LEFT_INPUT))
+        {
+            rotation.x += 1.0f * deltaTime;
+        }
+        if (inputHandler.is_key_pressed(MOVE_DOWN_INPUT))
+        {
+            rotation.y -= 1.0f * deltaTime;
+            rotation.y = std::max(rotation.y, -CL_M_PI_2_F + 0.001f);
+        }
+        if (inputHandler.is_key_pressed(MOVE_RIGHT_INPUT))
+        {
+            rotation.x -= 1.0f * deltaTime;
+        }
 
-        rotationMatrix = glm::mat4(1.0f);
+        glm::mat4 rotationMatrix{ 1.0f };
         rotationMatrix = glm::rotate(rotationMatrix, rotation.x, glm::vec3(0.0f, 1.0f, 0.0f));
         rotationMatrix = glm::rotate(rotationMatrix, rotation.y, glm::vec3(1.0f, 0.0f, 0.0f));
         cameraPosition = glm::vec3(rotationMatrix * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
@@ -289,20 +294,14 @@ int main()
 
         if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT) || inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT))
         {
-            glm::vec2 pos = glm::vec2(inputHandler.cursor_position() / windowDimensions);
-            glm::vec2 absPos = glm::vec2(pos.x, -pos.y) * 2.0f + glm::vec2(-1.0f, 1.0f);
-            glm::vec4 rotPos = rotationMatrix * glm::vec4(absPos, 0.0f, 0.0f);
-            //glm::vec4 wPos = projectionMatrix * viewMatrix * glm::vec4(rotPos);
-
-            //std::cout << "SCREEN\t[" << pos.x << ", " << pos.y << "]\n";
-            //std::cout << "ABS\t[" << absPos.x << ", " << absPos.y << "]\n";
-            //std::cout << "ROT\t[" << rotPos.x << ", " << rotPos.y << ", " << rotPos.z << "]\n";
-            //std::cout << "WORLD\t[" << wPos.x << ", " << wPos.y << ", " << wPos.z << "]\n\n";
+            glm::vec2 screenPosition = glm::vec2(inputHandler.cursor_position() / windowDimensions);
+            glm::vec2 absolutePosition = glm::vec2(screenPosition.x, -screenPosition.y) * 2.0f + glm::vec2(projectionDimensions.x, projectionDimensions.w);
+            glm::vec4 rotatedPosition = rotationMatrix * glm::vec4(absolutePosition / zoom, 0.0f, 0.0f);
 
             float gravity = 0.0f;
             if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT)) gravity = 0.1f;
             if (inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT)) gravity = -0.1f;
-            create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(rotPos.x, rotPos.y, rotPos.z), gravity);
+            create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(rotatedPosition.x, rotatedPosition.y, rotatedPosition.z), gravity);
 
             glBindVertexArray(GRAV_VAO);
             glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
@@ -322,7 +321,7 @@ int main()
         }
         if (inputHandler.scroll_direction().y)
         {
-            scrollValue = inputHandler.scroll_direction();
+            glm::vec2 scrollValue = inputHandler.scroll_direction();
 
             bool hueshiftKey = inputHandler.is_key_pressed(CHANGE_HUE_INPUT);
             bool saturationshiftKey = inputHandler.is_key_pressed(CHANGE_SATURATION_INPUT);
