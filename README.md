@@ -41,3 +41,10 @@ On average, any particle count below 3 million yields the same performance.
 * [ESC] exit
 
 ## Features
+
+## Libraries
+The following libraries are required: 
+* OpenCL
+* GLFW
+* GLAD
+* GLM
