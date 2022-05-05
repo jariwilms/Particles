@@ -31,5 +31,6 @@
 *.out
 *.app
 /.vs/Particles/v17
-/Particles/x64/Debug
-/x64/Debug
+/Dependencies
+/Particles/x64
+/x64
