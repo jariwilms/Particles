@@ -299,7 +299,11 @@ int main()
             //std::cout << "ROT\t[" << rotPos.x << ", " << rotPos.y << ", " << rotPos.z << "]\n";
             //std::cout << "WORLD\t[" << wPos.x << ", " << wPos.y << ", " << wPos.z << "]\n\n";
 
-            create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(rotPos.x, -rotPos.y, rotPos.z) * 2.0f, 0.1f);
+            float gravity = 0.0f;
+            if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT)) gravity = 0.1f;
+            if (inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT)) gravity = -0.1f;
+            create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(rotPos.x, -rotPos.y, rotPos.z) * 2.0f, gravity);
+
             glBindVertexArray(GRAV_VAO);
             glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
             glBufferSubData(GL_ARRAY_BUFFER, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data());
