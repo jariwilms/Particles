@@ -143,7 +143,7 @@ int main()
 
 
 
-    int test;
+
     //OpenCL setup
     error = clGetPlatformIDs(1, &platformId, &numPlatforms);
     error = clGetDeviceIDs(platformId, CL_DEVICE_TYPE_GPU, 1, &deviceId, &numDevices);
