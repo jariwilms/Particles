@@ -195,7 +195,7 @@ int main()
 
     //Create shared gravitor buffer
     hostGravitorBuffer.resize(GRAVITOR_BUFFER_SIZE);
-    create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f), 0.1f);
+    create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f, 0.2f, 0.0f), 0.1f);
     clGravitorBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, GRAVITOR_BUFFER_SIZE * sizeof(Gravitor), nullptr, &error);
     error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
 
@@ -255,7 +255,7 @@ int main()
 
 
     //projectionMatrix = glm::perspective(glm::radians(15.0f), (float)windowDimensions.x / (float)windowDimensions.y, 0.1f, 100.0f);
-    projectionMatrix = glm::ortho(-1.0f, 1.0f, 1.0f, -1.0f, 0.1f, 10.0f);
+    projectionMatrix = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, 0.1f, 10.0f);
 
 
 
@@ -290,9 +290,9 @@ int main()
         if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT) || inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT))
         {
             glm::vec2 pos = glm::vec2(inputHandler.cursor_position() / windowDimensions);
-            glm::vec2 absPos = (glm::vec2(pos.x, -pos.y) + glm::vec2(-0.5f, 0.5f)) * 2.0f;
+            glm::vec2 absPos = glm::vec2(pos.x, -pos.y) * 2.0f + glm::vec2(-1.0f, 1.0f);
             glm::vec4 rotPos = rotationMatrix * glm::vec4(absPos, 0.0f, 0.0f);
-            glm::vec4 wPos = projectionMatrix * viewMatrix * glm::vec4(rotPos);
+            //glm::vec4 wPos = projectionMatrix * viewMatrix * glm::vec4(rotPos);
 
             //std::cout << "SCREEN\t[" << pos.x << ", " << pos.y << "]\n";
             //std::cout << "ABS\t[" << absPos.x << ", " << absPos.y << "]\n";
@@ -302,7 +302,7 @@ int main()
             float gravity = 0.0f;
             if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT)) gravity = 0.1f;
             if (inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT)) gravity = -0.1f;
-            create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(rotPos.x, -rotPos.y, rotPos.z), gravity);
+            create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(rotPos.x, rotPos.y, rotPos.z), gravity);
 
             glBindVertexArray(GRAV_VAO);
             glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
