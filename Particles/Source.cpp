@@ -290,7 +290,7 @@ int main()
         if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT) || inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT))
         {
             glm::vec2 pos = glm::vec2(inputHandler.cursor_position() / windowDimensions);
-            glm::vec2 absPos = glm::vec2(pos.x, -pos.y) + glm::vec2(-0.5f, 0.5f);
+            glm::vec2 absPos = (glm::vec2(pos.x, -pos.y) + glm::vec2(-0.5f, 0.5f)) * 2.0f;
             glm::vec4 rotPos = rotationMatrix * glm::vec4(absPos, 0.0f, 0.0f);
             glm::vec4 wPos = projectionMatrix * viewMatrix * glm::vec4(rotPos);
 
@@ -302,7 +302,7 @@ int main()
             float gravity = 0.0f;
             if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT)) gravity = 0.1f;
             if (inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT)) gravity = -0.1f;
-            create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(rotPos.x, -rotPos.y, rotPos.z) * 2.0f, gravity);
+            create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(rotPos.x, -rotPos.y, rotPos.z), gravity);
 
             glBindVertexArray(GRAV_VAO);
             glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
