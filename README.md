@@ -11,33 +11,34 @@ Computer specs:
 CPU: Ryzen 5 2600  
 GPU: GTX 1060 6GB  
 
-When calculating energy (particle lifetime), the buffer data has to be moved from the GPU to the CPU and back.  
-Doing this every frame will cause large delays before the window can update.  
-The table below shows the average framerate over a period of 30 seconds with and without energy calculation
+The table below shows the average framerate for a given particle count.
 
-|  Particles | Framerate | Frame Time | Energy? |
+|  Particles | Framerate |  Frametime | Energy? |
 |:----------:|:---------:|:----------:|:-------:|
-|    100 000 |    141.87 |     7.05ms |      no |
-|    100 000 |   142.007 |     7.05ms |     yes |
-|  1 000 000 |    142.29 |     7.02ms |      no |
-|  1 000 000 |     58.36 |    17.13ms |     yes |
-|  3 000 000 |    141.93 |     7.04ms |      no |
-|  3 000 000 |     24.96 |    40.06ms |     yes |
-|  5 000 000 |    101.83 |     9.81ms |      no |
-| 10 000 000 |     55.23 |    18.10ms |      no |
+|    100 000 |   1370.69 |     0.73ms |      no |
+|    100 000 |    359.85 |     2.78ms |     yes |
+|  1 000 000 |    400.53 |     2.49ms |      no |
+|  1 000 000 |     64.97 |    15.39ms |     yes |
+|  3 000 000 |    155.32 |     6.44ms |      no |
+|  3 000 000 |     26.87 |    37.22ms |     yes |
+|  5 000 000 |     98.61 |    10.14ms |      no |
+| 10 000 000 |     52.20 |    19.15ms |      no |
 
-On average, any particle count below 3 million yields the same performance.  
+As you can see, moving data between the CPU and GPU causes a large performance loss, even for small amounts.  
 
 ## Controls
 * [M1] place gravitor
 * [M2] place repulsor
-* [WASD] scene rotation
+* [WASD] rotate scene
+* [SCROLL] change zoom level
+* [SCROLL+F] change hue
+* [SCROLL+G] change saturation
+* [SCROLL+H] change value
+* [SCROLL+V] change background r
+* [SCROLL+B] change background g
+* [SCROLL+B] change background b
 * [P] toggle movement
 * [C] toggle gravity
-* [SCROLL] change zoom level
-* [F+SCROLL] change hue
-* [G+SCROLL] change saturation
-* [H+SCROLL] change value
 * [ESC] exit
 
 ## Features
