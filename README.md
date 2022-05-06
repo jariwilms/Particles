@@ -34,9 +34,9 @@ As you can see, moving data between the CPU and GPU causes a large performance l
 * [SCROLL+F] change hue
 * [SCROLL+G] change saturation
 * [SCROLL+H] change value
-* [SCROLL+V] change background r
-* [SCROLL+B] change background g
-* [SCROLL+B] change background b
+* [SCROLL+V] change background R
+* [SCROLL+B] change background G
+* [SCROLL+B] change background B
 * [P] toggle movement
 * [C] toggle gravity
 * [ESC] exit
