@@ -3,7 +3,7 @@
 Emitter::Emitter(float emissionRate)
 	: m_position{}, m_velocity{}, m_particles{ nullptr }, m_emissionRate{ emissionRate }, m_isEmitting{ true }, m_deltaTime{ 0.0f }
 {
-	generator = _particle_generator_uniform;
+	generator = _particle_generator_cube;
 	settings = GeneratorSettings{};
 }
 

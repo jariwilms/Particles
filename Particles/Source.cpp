@@ -48,7 +48,7 @@ void generatorTestFunc()
         std::cout << "Generating " << particlesToGenerate << " particles\n";
         
         t0 = std::chrono::high_resolution_clock::now();
-        generate_particles_st(particles.data(), particleCount, particlesToGenerate, _particle_generator_uniform, settings);
+        generate_particles_st(particles.data(), particleCount, particlesToGenerate, _particle_generator_cube, settings);
         t1 = std::chrono::high_resolution_clock::now();
         singleDelta = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(t1 - t0).count() / 1000.0f;
         std::cout << "ST TIME: " << singleDelta << '\n';
@@ -56,7 +56,7 @@ void generatorTestFunc()
         particleCount = 0;
 
         t0 = std::chrono::high_resolution_clock::now();
-        generate_particles_mt(particles.data(), particleCount, particlesToGenerate, _particle_generator_uniform, settings);
+        generate_particles_mt(particles.data(), particleCount, particlesToGenerate, _particle_generator_cube, settings);
         t1 = std::chrono::high_resolution_clock::now();
         multiDelta = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(t1 - t0).count() / 1000.0f;
         std::cout << "MT TIME: " << multiDelta << "\n";
@@ -106,7 +106,7 @@ int main()
 
 
 
-    glm::vec2 windowDimensions{ 800 };                                                    //Dimensions of viewport
+    glm::vec2 windowDimensions{ 800 };                                                  //Dimensions of viewport
     GLFWwindow* window = setup_gl(windowDimensions);                                    //OpenGL setup
 
     glm::mat4 modelMatrix{ 1.0f };                                                      //Converts local to global space
@@ -115,12 +115,13 @@ int main()
 
     glm::vec2 rotation{ 0.0f };                                                         //Current rotation of the camera around the origin
     glm::vec3 cameraPosition{ 0.0f };                                                   //Position of the camera after rotation
-    float zoom{ 1.0f };
+    float zoom{ 1.0f };                                                                 //Zoom level
 
     Program particleShader("Shaders/particle.vs", nullptr, "Shaders/particle.fs");      //Particle shader
     Program gravitorShader("Shaders/gravitor.vs", nullptr, "Shaders/gravitor.fs");      //Gravitor shader
 
     InputHandler inputHandler(window);                                                  //Class that handles input events
+    std::vector<float> frameTimes{};                                                    //Vector of time taken per frame
 
 
 
@@ -128,7 +129,9 @@ int main()
     bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
     bool calculateEnergy = false;                                                       //Should energy be calculated every update?
 
-    glm::vec3 hsv{};
+    glm::vec3 hsv{};                                                                    //Hue Saturation Value shift of particle colors
+    glm::vec4 backgroundColor{ 0.1f, 0.1f, 0.1f, 1.0f };                                //Color of the background
+    bool hueShift = true;                                                               //Shift hue with time?
     int particleSize = 1;                                                               //Size of particles
 
 
@@ -188,7 +191,7 @@ int main()
 
     //Create shared gravitor buffer
     hostGravitorBuffer.resize(GRAVITOR_BUFFER_SIZE);
-    create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f, 0.2f, 0.0f), 0.1f);
+    create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f), 0.1f);
     clGravitorBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, GRAVITOR_BUFFER_SIZE * sizeof(Gravitor), nullptr, &error);
     error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
 
@@ -241,7 +244,7 @@ int main()
     //Map GPU memory to a host pointer and generate an initial amount of particles
     error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
     Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_WRITE_ONLY, 0, initialParticles * sizeof(Particle), 0, nullptr, nullptr, &error);
-    Emitter::GenerateOnce(particles, particleCount, initialParticles, _particle_generator_sphere, settings);
+    Emitter::GenerateOnce(particles, particleCount, initialParticles, _particle_generator_cube, settings);
     clEnqueueUnmapMemObject(commandQueue, clParticleBuffer, particles, 0, nullptr, nullptr);
     error = clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
@@ -258,30 +261,32 @@ int main()
         t0 = std::chrono::high_resolution_clock::now();
         inputHandler.update();
         
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClearColor(backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a);
         glClear(GL_COLOR_BUFFER_BIT);
 
 
 
         error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
+        if (inputHandler.is_key_pressed_once(CLOSE_WINDOW_KEY)) glfwSetWindowShouldClose(window, true);
+
         if (inputHandler.is_key_pressed(MOVE_UP_INPUT))
         {
-            rotation.y += 1.0f * deltaTime;
+            rotation.y += deltaTime;
             rotation.y = std::min(rotation.y, CL_M_PI_2_F - 0.001f);
         }
         if (inputHandler.is_key_pressed(MOVE_LEFT_INPUT))
         {
-            rotation.x += 1.0f * deltaTime;
+            rotation.x += deltaTime;
         }
         if (inputHandler.is_key_pressed(MOVE_DOWN_INPUT))
         {
-            rotation.y -= 1.0f * deltaTime;
+            rotation.y -= deltaTime;
             rotation.y = std::max(rotation.y, -CL_M_PI_2_F + 0.001f);
         }
         if (inputHandler.is_key_pressed(MOVE_RIGHT_INPUT))
         {
-            rotation.x -= 1.0f * deltaTime;
+            rotation.x -= deltaTime;
         }
 
         glm::mat4 rotationMatrix{ 1.0f };
@@ -292,6 +297,12 @@ int main()
         viewMatrix = glm::lookAt(cameraPosition, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         viewMatrix = glm::scale(viewMatrix, glm::vec3(zoom));
 
+        if (hueShift)
+        {
+            hsv.x += deltaTime * 0.01f;
+            if (hsv.x > 1.0f) hsv.x = 0.0f;
+            if (hsv.x < 0.0f) hsv.x = 1.0f;
+        }
         if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT) || inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT))
         {
             glm::vec2 screenPosition = glm::vec2(inputHandler.cursor_position() / windowDimensions);
@@ -323,27 +334,41 @@ int main()
         {
             glm::vec2 scrollValue = inputHandler.scroll_direction();
 
-            bool hueshiftKey = inputHandler.is_key_pressed(CHANGE_HUE_INPUT);
-            bool saturationshiftKey = inputHandler.is_key_pressed(CHANGE_SATURATION_INPUT);
-            bool valueshiftKey = inputHandler.is_key_pressed(CHANGE_VALUE_INPUT);
-
-            if (hueshiftKey)
+            if (inputHandler.is_key_pressed(CHANGE_HUE_INPUT))
             {
                 hsv.x += scrollValue.y * deltaTime;
                 if (hsv.x > 1.0f) hsv.x = 0.0f;
                 if (hsv.x < 0.0f) hsv.x = 1.0f;
             }
-            else if (saturationshiftKey)
+            else if (inputHandler.is_key_pressed(CHANGE_SATURATION_INPUT))
             {
                 hsv.y += scrollValue.y * deltaTime;
                 if (hsv.y > 1.0f) hsv.y = 1.0f;
                 if (hsv.y < -1.0f) hsv.y = -1.0f;
             }
-            else if (valueshiftKey)
+            else if (inputHandler.is_key_pressed(CHANGE_VALUE_INPUT))
             {
                 hsv.z += scrollValue.y * deltaTime;
                 if (hsv.z > 1.0f) hsv.z = 1.0f;
                 if (hsv.z < -1.0f) hsv.z = -1.0f;
+            }
+            else if (inputHandler.is_key_pressed(CHANGE_BACKGROUND_R_INPUT))
+            {
+                backgroundColor.r += scrollValue.y * deltaTime;
+                backgroundColor.r = std::min(backgroundColor.r, 1.0f);
+                backgroundColor.r = std::max(backgroundColor.r, 0.0f);
+            }
+            else if (inputHandler.is_key_pressed(CHANGE_BACKGROUND_G_INPUT))
+            {
+                backgroundColor.g += scrollValue.y * deltaTime;
+                backgroundColor.g = std::min(backgroundColor.g, 1.0f);
+                backgroundColor.g = std::max(backgroundColor.g, 0.0f);
+            }
+            else if (inputHandler.is_key_pressed(CHANGE_BACKGROUND_B_INPUT))
+            {
+                backgroundColor.b += scrollValue.y * deltaTime;
+                backgroundColor.b = std::min(backgroundColor.b, 1.0f);
+                backgroundColor.b = std::max(backgroundColor.b, 0.0f);
             }
             else
             {
@@ -420,14 +445,14 @@ int main()
 
 
 
-        glFinish();
         glfwSwapBuffers(window);
 
         t1 = std::chrono::high_resolution_clock::now();
         deltaTime = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(t1 - t0).count() / 1000.0f;
         
         ++updateCount;
-        //if (t1 > endTime) break;
+        frameTimes.push_back(deltaTime);
+        if (t1 > endTime) break;
     }
 
 
@@ -435,12 +460,18 @@ int main()
     auto now = std::chrono::high_resolution_clock::now();
     float timeElapsed = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(now - startTime).count() / 1000.0f;
 
+    float averageFrameTime{};
+    for (auto frameTime : frameTimes) averageFrameTime += frameTime;
+    averageFrameTime /= frameTimes.size();
+    averageFrameTime *= 1000.0f;
+
     system("cls");
     std::cout << "  RESULTS\n" << "  ------------------------\n";
     std::cout << std::setw(24) << std::left << "| INITIAL PARTICLES" << initialParticles << '\n';
     std::cout << std::setw(24) << std::left << "| UPDATES" << updateCount << '\n';
     std::cout << std::setw(24) << std::left << "| TIME ELAPSED" << timeElapsed << '\n';
     std::cout << std::setw(24) << std::left << "| UPDATES/SECOND" << updateCount / timeElapsed << '\n';
+    std::cout << std::setw(24) << std::left << "| AVG FRAME TIME" << averageFrameTime << "ms" << '\n';
 
 
 
@@ -456,5 +487,8 @@ int main()
     
     glfwTerminate();
 
+
+
+    std::cin.get();
     return 0;
 }

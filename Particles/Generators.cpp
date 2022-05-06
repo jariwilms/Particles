@@ -1,6 +1,6 @@
 #include "Generators.hpp"
 
-void _particle_generator_uniform(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
+void _particle_generator_cube(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
 {
     SEED_GENERATOR;
 
@@ -19,10 +19,14 @@ void _particle_generator_uniform(Particle* particles, size_t offset, size_t amou
         vy = RAND_F(settings.velocity_min.y, settings.velocity_max.y);
         vz = RAND_F(settings.velocity_min.z, settings.velocity_max.z);
 
-        cr = RAND_F(settings.color_min.r, settings.color_max.r);
-        cg = RAND_F(settings.color_min.g, settings.color_max.g);
-        cb = RAND_F(settings.color_min.b, settings.color_max.b);
-        ca = RAND_F(settings.color_min.a, settings.color_max.a);
+        //cr = RAND_F(settings.color_min.r, settings.color_max.r);
+        //cg = RAND_F(settings.color_min.g, settings.color_max.g);
+        //cb = RAND_F(settings.color_min.b, settings.color_max.b);
+        //ca = RAND_F(settings.color_min.a, settings.color_max.a);
+        cr = px;
+        cg = py;
+        cb = pz;
+        ca = 0.5f;
 
         en = RAND_F(settings.energy_min, settings.energy_max);
 

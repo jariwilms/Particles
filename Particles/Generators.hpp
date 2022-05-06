@@ -7,6 +7,7 @@
 #include <random>
 #include <thread>
 #include <cmath>
+#include <numbers>
 
 #include "OpenCL.hpp"
 #include "Particle.hpp"
@@ -24,7 +25,7 @@ using ParticleGenerator = void(*)(Particle* particles, size_t particleCount, siz
 #define GEN_SIG Particle* particles, size_t& particleCount, size_t amount, ParticleGenerator generator, GeneratorSettings settings
 // https://www.youtube.com/watch?v=UvZjzKOpdVM
 
-void _particle_generator_uniform(_P_GEN_SIG);
+void _particle_generator_cube(_P_GEN_SIG);
 void _particle_generator_sphere(_P_GEN_SIG);
 void _particle_generator_cone(_P_GEN_SIG);
 

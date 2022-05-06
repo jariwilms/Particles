@@ -37,8 +37,8 @@ void main()
     vec3 modified = hsv_to_rgb(original + hsv);
 
 //    fragmentColor = vec4(1.0);
-//    fragmentColor = vec4(modified, vertexColor.a);                                                                  //particle color + hsv
+    fragmentColor = vec4(modified, vertexColor.a);                                                                  //particle color + hsv
 //    fragmentColor = vec4(vec2(gl_FragCoord.xy / screenSize), gl_FragCoord.z, 1.0);                                  //color depends on fragment coordinate
 //    fragmentColor = vec4(0.2, 0.5, 0.7, 0.5) + vec4(0.2, 0.3, 0.5, 0.5) * sqrt(distanceFromCenter);                 //color depends on distance from center
-    fragmentColor = vec4((distanceFromCenter) * centerColor + ((1 - distanceFromCenter) * borderColor), 0.8);
+//    fragmentColor = vec4((distanceFromCenter) * centerColor + ((1 - distanceFromCenter) * borderColor), vertexColor.a);
 } 
