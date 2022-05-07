@@ -17,12 +17,12 @@ The table below shows the average framerate for a given particle count.
 |:----------:|:---------:|:----------:|:-------:|
 |    100 000 |   1370.69 |     0.73ms |      no |
 |    100 000 |    359.85 |     2.78ms |     yes |
-|  1 000 000 |    400.53 |     2.49ms |      no |
+|  1 000 000 |    413.63 |     2.42ms |      no |
 |  1 000 000 |     64.97 |    15.39ms |     yes |
 |  3 000 000 |    155.32 |     6.44ms |      no |
 |  3 000 000 |     26.87 |    37.22ms |     yes |
 |  5 000 000 |     98.61 |    10.14ms |      no |
-| 10 000 000 |     52.20 |    19.15ms |      no |
+| 10 000 000 |     52.32 |    19.11ms |      no |
 
 As you can see, moving data between the CPU and GPU causes a large performance loss, even for small amounts.  
 
@@ -44,7 +44,7 @@ As you can see, moving data between the CPU and GPU causes a large performance l
 ## Features
 
 ## Libraries
-The following libraries are required: 
+The following libraries were used: 
 * OpenCL
 * GLFW
 * GLAD
