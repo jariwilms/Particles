@@ -23,9 +23,19 @@ void _particle_generator_cube(Particle* particles, size_t offset, size_t amount,
         //cg = RAND_F(settings.color_min.g, settings.color_max.g);
         //cb = RAND_F(settings.color_min.b, settings.color_max.b);
         //ca = RAND_F(settings.color_min.a, settings.color_max.a);
-        cr = px;
-        cg = py;
-        cb = pz;
+        if (px < 0.0f)
+        {
+            cr = 1.0f;
+            cg = 0.0f;
+        }
+        else
+        {
+            cr = 0.0f;
+            cg = 1.0f;
+        }
+        //cr = px;
+        //cg = py;
+        cb = 0.0f;
         ca = 0.5f;
 
         en = RAND_F(settings.energy_min, settings.energy_max);

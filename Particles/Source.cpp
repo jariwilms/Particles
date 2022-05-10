@@ -299,9 +299,7 @@ int main()
 
         if (hueShift)
         {
-            hsv.x += deltaTime * 0.01f;
-            if (hsv.x > 1.0f) hsv.x = 0.0f;
-            if (hsv.x < 0.0f) hsv.x = 1.0f;
+            hsv.x += deltaTime * 0.1f;
         }
         if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT) || inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT))
         {
@@ -337,20 +335,14 @@ int main()
             if (inputHandler.is_key_pressed(CHANGE_HUE_INPUT))
             {
                 hsv.x += scrollValue.y * deltaTime;
-                if (hsv.x > 1.0f) hsv.x = 0.0f;
-                if (hsv.x < 0.0f) hsv.x = 1.0f;
             }
             else if (inputHandler.is_key_pressed(CHANGE_SATURATION_INPUT))
             {
                 hsv.y += scrollValue.y * deltaTime;
-                if (hsv.y > 1.0f) hsv.y = 1.0f;
-                if (hsv.y < -1.0f) hsv.y = -1.0f;
             }
             else if (inputHandler.is_key_pressed(CHANGE_VALUE_INPUT))
             {
                 hsv.z += scrollValue.y * deltaTime;
-                if (hsv.z > 1.0f) hsv.z = 1.0f;
-                if (hsv.z < -1.0f) hsv.z = -1.0f;
             }
             else if (inputHandler.is_key_pressed(CHANGE_BACKGROUND_R_INPUT))
             {
@@ -381,15 +373,9 @@ int main()
         if (calculateEnergy)
         {
             size_t count = 0;
-            for (auto& emitter : emitters) count += emitter->gen_count(deltaTime);
 
             Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_READ_WRITE, 0, (particleCount + count) * sizeof(Particle), 0, nullptr, nullptr, &error);
             remove_dead_particles(particles, particleCount);
-            for (auto emitter : emitters)
-            {
-                emitter->bind(particles);
-                emitter->update(particleCount, deltaTime);
-            }
             error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, (particleCount) * sizeof(Particle), particles, 0, nullptr, nullptr);
             error = clEnqueueUnmapMemObject(commandQueue, clParticleBuffer, particles, 0, nullptr, nullptr);
 
@@ -420,9 +406,9 @@ int main()
 
         //Draw gravitors
         gravitorShader.use();
-        gravitorShader.setMat4("model", modelMatrix);
-        gravitorShader.setMat4("view", viewMatrix);
-        gravitorShader.setMat4("projection", projectionMatrix);
+        gravitorShader.setMat4("uModel", modelMatrix);
+        gravitorShader.setMat4("uView", viewMatrix);
+        gravitorShader.setMat4("uProjection", projectionMatrix);
 
         glPointSize(6);
         glBindVertexArray(GRAV_VAO);
@@ -432,12 +418,13 @@ int main()
 
         //Draw particles
         particleShader.use();
-        particleShader.setMat4("model", modelMatrix);
-        particleShader.setMat4("view", viewMatrix);
-        particleShader.setMat4("projection", projectionMatrix);
+        particleShader.setMat4("uModel", modelMatrix);
+        particleShader.setMat4("uView", viewMatrix);
+        particleShader.setMat4("uProjection", projectionMatrix);
 
-        particleShader.setVec2("screenSize", windowDimensions);
-        particleShader.setVec3("hsv", hsv);
+        particleShader.setFloat("uTime", (float)glfwGetTime());
+        particleShader.setVec2("uSreenSize", windowDimensions);
+        particleShader.setVec3("uHSV", hsv);
 
         glPointSize((GLfloat)particleSize);
         glBindVertexArray(PART_VAO);

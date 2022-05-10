@@ -11,13 +11,8 @@ GLFWwindow* setup_gl(glm::uvec2 windowDimensions)
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     GLFWwindow* window = glfwCreateWindow(windowDimensions.x, windowDimensions.y, "Particles", nullptr, nullptr);
-    if (window == nullptr)
-    {
-        std::cout << "Failed to create GLFW window" << std::endl;
-        glfwTerminate();
-        return nullptr;
-    }
     glfwMakeContextCurrent(window);
+    glfwSwapInterval(0);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -25,10 +20,8 @@ GLFWwindow* setup_gl(glm::uvec2 windowDimensions)
         exit(1);
     }
 
-    glfwSwapInterval(0);
-
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFunc(GL_ONE, GL_ONE);
 
     return window;
 }
