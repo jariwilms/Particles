@@ -12,7 +12,6 @@ GLFWwindow* setup_gl(glm::uvec2 windowDimensions)
 
     GLFWwindow* window = glfwCreateWindow(windowDimensions.x, windowDimensions.y, "Particles", nullptr, nullptr);
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(0);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -21,7 +20,9 @@ GLFWwindow* setup_gl(glm::uvec2 windowDimensions)
     }
 
     glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
+    glBlendFunc(GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR);
+
+    glfwSwapInterval(0);
 
     return window;
 }

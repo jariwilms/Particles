@@ -90,7 +90,6 @@ public:
         glDeleteShader(fragment);
         if (geometryPath != nullptr)
             glDeleteShader(geometry);
-
     }
 
     unsigned int get_id() const

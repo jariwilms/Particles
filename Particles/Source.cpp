@@ -95,7 +95,7 @@ int main()
 
 
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
-    size_t initialParticles = 1000000;                                                  //Amount of particles to generate at the start of the simulation
+    size_t initialParticles = 100000;                                                  //Amount of particles to generate at the start of the simulation
     size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
 
     std::vector<Gravitor> hostGravitorBuffer;                                           //Gravitor buffer of static size that remains on the host
@@ -131,8 +131,9 @@ int main()
 
     glm::vec3 hsv{};                                                                    //Hue Saturation Value shift of particle colors
     glm::vec4 backgroundColor{ 0.1f, 0.1f, 0.1f, 1.0f };                                //Color of the background
-    bool hueShift = true;                                                               //Shift hue with time?
+    bool hueShift = false;                                                               //Shift hue with time?
     int particleSize = 1;                                                               //Size of particles
+    float scrollMultiplier = 10.0f;
 
 
 
@@ -191,7 +192,7 @@ int main()
 
     //Create shared gravitor buffer
     hostGravitorBuffer.resize(GRAVITOR_BUFFER_SIZE);
-    create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f), 0.1f);
+    create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f), 0.01f);
     clGravitorBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, GRAVITOR_BUFFER_SIZE * sizeof(Gravitor), nullptr, &error);
     error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
 
@@ -237,9 +238,9 @@ int main()
 
 
 
-    GeneratorSettings settings;
-    settings.color_max = glm::vec4(0.0f, 0.8f, 0.5f, 0.2f);
-    settings.color_min = glm::vec4(0.0f, 0.2f, 0.1f, 0.2f);
+    GeneratorSettings settings{};
+    //settings.color_max = glm::vec4(0.0f, 0.8f, 0.5f, 0.2f);
+    //settings.color_min = glm::vec4(0.0f, 0.2f, 0.1f, 0.2f);
 
     //Map GPU memory to a host pointer and generate an initial amount of particles
     error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
@@ -299,7 +300,7 @@ int main()
 
         if (hueShift)
         {
-            hsv.x += deltaTime * 0.1f;
+            hsv.x += deltaTime * 0.01f;
         }
         if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT) || inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT))
         {
@@ -330,43 +331,46 @@ int main()
         }
         if (inputHandler.scroll_direction().y)
         {
-            glm::vec2 scrollValue = inputHandler.scroll_direction();
+            float scrollValueY = inputHandler.scroll_direction().y;
+            scrollValueY *= scrollMultiplier;
 
             if (inputHandler.is_key_pressed(CHANGE_HUE_INPUT))
             {
-                hsv.x += scrollValue.y * deltaTime;
+                hsv.x += scrollValueY * deltaTime;
+                hsv.x = std::fmod(hsv.x, 1.0f);
             }
             else if (inputHandler.is_key_pressed(CHANGE_SATURATION_INPUT))
             {
-                hsv.y += scrollValue.y * deltaTime;
+                hsv.y += scrollValueY * deltaTime;
+                hsv.y = std::clamp(hsv.y, -1.0f, 1.0f);
             }
             else if (inputHandler.is_key_pressed(CHANGE_VALUE_INPUT))
             {
-                hsv.z += scrollValue.y * deltaTime;
+                hsv.z += scrollValueY * deltaTime;
+                hsv.z = std::clamp(hsv.z, -1.0f, 1.0f);
             }
             else if (inputHandler.is_key_pressed(CHANGE_BACKGROUND_R_INPUT))
             {
-                backgroundColor.r += scrollValue.y * deltaTime;
+                backgroundColor.r += scrollValueY * deltaTime;
                 backgroundColor.r = std::min(backgroundColor.r, 1.0f);
                 backgroundColor.r = std::max(backgroundColor.r, 0.0f);
             }
             else if (inputHandler.is_key_pressed(CHANGE_BACKGROUND_G_INPUT))
             {
-                backgroundColor.g += scrollValue.y * deltaTime;
+                backgroundColor.g += scrollValueY * deltaTime;
                 backgroundColor.g = std::min(backgroundColor.g, 1.0f);
                 backgroundColor.g = std::max(backgroundColor.g, 0.0f);
             }
             else if (inputHandler.is_key_pressed(CHANGE_BACKGROUND_B_INPUT))
             {
-                backgroundColor.b += scrollValue.y * deltaTime;
+                backgroundColor.b += scrollValueY * deltaTime;
                 backgroundColor.b = std::min(backgroundColor.b, 1.0f);
                 backgroundColor.b = std::max(backgroundColor.b, 0.0f);
             }
             else
             {
-                zoom += scrollValue.y * 0.1f;
-                zoom = std::min(zoom, 100.0f);
-                zoom = std::max(zoom, 0.1f);
+                zoom += scrollValueY * 0.01f;
+                zoom = std::clamp(zoom, 0.1f, 100.0f);
             }
         }
 
@@ -423,8 +427,8 @@ int main()
         particleShader.setMat4("uProjection", projectionMatrix);
 
         particleShader.setFloat("uTime", (float)glfwGetTime());
-        particleShader.setVec2("uSreenSize", windowDimensions);
         particleShader.setVec3("uHSV", hsv);
+        particleShader.setVec2("uResolution", windowDimensions);
 
         glPointSize((GLfloat)particleSize);
         glBindVertexArray(PART_VAO);
@@ -439,7 +443,7 @@ int main()
         
         ++updateCount;
         frameTimes.push_back(deltaTime);
-        if (t1 > endTime) break;
+        //if (t1 > endTime) break;
     }
 
 

@@ -1,7 +1,8 @@
 #version 460 core
 
-uniform vec3 hsv;
-uniform vec2 screenSize;
+uniform vec3 uTime;
+uniform vec3 uHSV;
+uniform vec2 uResolution;
 
 in vec4 vertexColor;
 
@@ -27,18 +28,21 @@ vec3 hsv_to_rgb(vec3 c)
 
 void main()
 {
-    vec2 normalizedCoordinate = gl_FragCoord.xy / screenSize;
-    float distanceFromCenter = distance(normalizedCoordinate, vec2(0.5)) + 0.3;
+    vec2 uv = gl_FragCoord.xy / uResolution;
+    float distanceFromCenter = distance(uv, vec2(0.5));
+    distanceFromCenter += 0.2;
 
-    vec3 centerColor = vec3(1.0, 0.0, 1.0);
-    vec3 borderColor = vec3(0.0, 1.0, 1.0);
+    vec3 centerColor = vec3(0.0, 1.0, 1.0);
+    vec3 borderColor = vec3(1.0, 0.0, 1.0);
 
-    vec3 original = rgb_to_hsv(vertexColor.xyz);
-    vec3 modified = hsv_to_rgb(original + hsv);
+    vec3 colorHSV = rgb_to_hsv(vertexColor.xyz);
+    vec3 colorRGB = hsv_to_rgb(colorHSV + uHSV);
 
 //    fragmentColor = vec4(1.0);
-    fragmentColor = vec4(modified, vertexColor.a);                                                                  //particle color + hsv
-//    fragmentColor = vec4(vec2(gl_FragCoord.xy / screenSize), gl_FragCoord.z, 1.0);                                  //color depends on fragment coordinate
-//    fragmentColor = vec4(0.2, 0.5, 0.7, 0.5) + vec4(0.2, 0.3, 0.5, 0.5) * sqrt(distanceFromCenter);                 //color depends on distance from center
-//    fragmentColor = vec4((distanceFromCenter) * centerColor + ((1 - distanceFromCenter) * borderColor), vertexColor.a);
+//    fragmentColor = vec4(uv, 0.0, 1.0);
+
+//    fragmentColor = vertexColor;
+    fragmentColor = vec4(colorRGB, vertexColor.a);                                                                  //particle color + hsv
+//    fragmentColor = vec4((1.0 - distanceFromCenter) * centerColor + distanceFromCenter * borderColor, 1.0);
+//    fragmentColor = vec4(vec3(1.0) * distanceFromCenter, 1.0);
 } 
