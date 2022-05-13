@@ -179,8 +179,10 @@ xcopy /y $(ProjectDir)Shaders $(OutDir)Shaders /e /h /c /i </Command>
     <ClInclude Include="Particle.hpp" />
     <ClInclude Include="PulseEmitter.hpp" />
     <ClInclude Include="Program.hpp" />
+    <ClInclude Include="ShaderInput.h" />
     <ClInclude Include="Source.hpp" />
     <ClInclude Include="StreamEmitter.hpp" />
+    <ClInclude Include="Transform.h" />
     <ClInclude Include="Utils.hpp" />
   </ItemGroup>
   <ItemGroup>

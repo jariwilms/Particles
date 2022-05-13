@@ -29,6 +29,8 @@
 #include "InputHandler.hpp"
 #include "StreamEmitter.hpp"
 #include "PulseEmitter.hpp"
+#include "Transform.h"
+#include "ShaderInput.h"
 
 const size_t PARTICLE_BUFFER_SIZE = 10000000;
 const size_t GRAVITOR_BUFFER_SIZE = 8;

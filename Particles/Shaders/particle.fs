@@ -1,8 +1,15 @@
 #version 460 core
 
-uniform vec3 uTime;
+layout(std140, binding = 0) uniform uGlobal
+{
+    vec2 resolution;
+    vec2 mouse;
+
+    float time;
+    float deltaTime;
+};
+
 uniform vec3 uHSV;
-uniform vec2 uResolution;
 
 in vec4 vertexColor;
 
@@ -28,12 +35,12 @@ vec3 hsv_to_rgb(vec3 c)
 
 void main()
 {
-    vec2 uv = gl_FragCoord.xy / uResolution;
-    float distanceFromCenter = distance(uv, vec2(0.5)) * 1.2;
-    distanceFromCenter += 0.2;
+    vec2 uv = gl_FragCoord.xy / resolution;
+//    float distanceFromCenter = distance(uv, vec2(0.5)) * 1.2;
+//    distanceFromCenter += 0.2;
 
-    vec3 centerColor = vec3(0.0, 1.0, 1.0);
-    vec3 borderColor = vec3(1.0, 0.0, 1.0);
+//    vec3 centerColor = vec3(0.0, 1.0, 1.0);
+//    vec3 borderColor = vec3(1.0, 0.0, 1.0);
 
     vec3 colorHSV = rgb_to_hsv(vertexColor.xyz);
     vec3 colorRGB = hsv_to_rgb(colorHSV + uHSV);
@@ -42,6 +49,7 @@ void main()
 //    fragmentColor = vec4(uv, 0.0, 1.0);                                                                           //UV based
 
 //    fragmentColor = vertexColor;                                                                                  //Particle color
-//    fragmentColor = vec4(colorRGB, vertexColor.a);                                                                //Particle color + HSV 
-    fragmentColor = vec4(mix(centerColor, borderColor, distanceFromCenter), vertexColor.a);                          //Particle color distance dependent + HSV
-} 
+    fragmentColor = vec4(colorRGB, vertexColor.a);                                                                //Particle color + HSV 
+//    fragmentColor = vec4(mix(centerColor, borderColor, distanceFromCenter), vertexColor.a);                          //Particle color distance dependent + HSV} 
+//    fragmentColor = vec4(mix(centerColor, borderColor, distanceFromCenter + abs((mouse.x / resolution.x) * 2.0 - 1.0) ), vertexColor.a);                          //Particle color distance dependent + HSV
+}

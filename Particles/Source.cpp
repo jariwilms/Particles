@@ -84,21 +84,23 @@ int main()
 
     cl_context context;                                                                 //Device context
     cl_command_queue commandQueue;                                                      //Queue for device commands
+    size_t globalWorkSize[3];                                                           //Amount of work dimensions the kernels are divided in
 
     cl_program program;                                                                 //Program that contains kernels
     cl_kernel kernelMV;                                                                 //KERNEL: Calculates particle movement
     cl_kernel kernelGV;                                                                 //KERNEL: Calculates particle gravity
     cl_kernel kernelEN;                                                                 //KERNEL: Calculates particle energy
 
-    size_t globalWorkSize[3];                                                           //Amount of work dimensions the kernels are divided in
-
-
+    bool calculateMovement = true;                                                      //Should movement be calculated every update?
+    bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
+    bool calculateEnergy = false;                                                       //Should energy be calculated every update?
 
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
-    size_t initialParticles = 100000;                                                  //Amount of particles to generate at the start of the simulation
+    size_t initialParticles = 10000000;                                                   //Amount of particles to generate at the start of the simulation
     size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
 
     std::vector<Gravitor> hostGravitorBuffer;                                           //Gravitor buffer of static size that remains on the host
+    size_t initialGravitors = 1;
     cl_mem clGravitorBuffer;                                                            //Pointer to GPU allocated gravitor buffer
     size_t gravitorCount{};                                                             //Amount of gravitors = > separate variable to prevent host / GPU buffer resizing (kinda useless because GRAVITOR_BUFFER_SIZE is 8
 
@@ -106,28 +108,26 @@ int main()
 
 
 
-    glm::vec2 windowDimensions{ 800 };                                                  //Dimensions of viewport
+
+
+    glm::vec2 windowDimensions{ 800.0f };                                               //Dimensions of viewport
     GLFWwindow* window = setup_gl(windowDimensions);                                    //OpenGL setup
+    InputHandler inputHandler(window);                                                  //Class that handles input events
 
-    glm::mat4 modelMatrix{ 1.0f };                                                      //Converts local to global space
-    glm::mat4 viewMatrix{ 1.0f };                                                       //Converts global to view space
-    glm::mat4 projectionMatrix{ 1.0f };                                                 //Converts view to screen/clip space
-
+    Transform transform{};
     glm::vec2 rotation{ 0.0f };                                                         //Current rotation of the camera around the origin
     glm::vec3 cameraPosition{ 0.0f };                                                   //Position of the camera after rotation
-    float zoom{ 1.0f };                                                                 //Zoom level
 
+    ShaderInput shaderInput{};
     Program particleShader("Shaders/particle.vs", nullptr, "Shaders/particle.fs");      //Particle shader
     Program gravitorShader("Shaders/gravitor.vs", nullptr, "Shaders/gravitor.fs");      //Gravitor shader
 
-    InputHandler inputHandler(window);                                                  //Class that handles input events
-    std::vector<float> frameTimes{};                                                    //Vector of time taken per frame
+    const unsigned int inputBufferId = 0;
+    const unsigned int transformBufferId = 1;                                           
+    float zoom{ 1.0f };                                                                 //Zoom level
 
 
 
-    bool calculateMovement = true;                                                      //Should movement be calculated every update?
-    bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
-    bool calculateEnergy = false;                                                       //Should energy be calculated every update?
 
     glm::vec3 hsv{ 0.0f, 1.0f, 1.0f };                                                  //Hue Saturation Value shift of particle colors
     glm::vec4 backgroundColor{ 0.1f, 0.1f, 0.1f, 0.5f };                                //Color of the background
@@ -141,8 +141,10 @@ int main()
     std::chrono::high_resolution_clock::time_point endTime;                             //Time to elapse before stopping the simulation
     std::chrono::high_resolution_clock::time_point t0;                                  //Time point before loop executes
     std::chrono::high_resolution_clock::time_point t1;                                  //Time point after loop has executed
+    std::vector<float> frameTimes{};                                                    //Vector of time taken per frame
     unsigned int updateCount{};                                                         //Total amount of updates the simulation has done
     float deltaTime{};                                                                  //Elapsed time between each update
+    float totalTime{};
 
 
 
@@ -211,6 +213,24 @@ int main()
 
 
 
+    //Create Shader input buffer
+    unsigned int INPUT_UBO;
+    glGenBuffers(1, &INPUT_UBO);
+    glBindBuffer(GL_UNIFORM_BUFFER, INPUT_UBO);
+    glBindBufferBase(GL_UNIFORM_BUFFER, inputBufferId, INPUT_UBO);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(ShaderInput), nullptr, GL_DYNAMIC_DRAW);
+
+
+
+    //Create shared uniform buffer
+    unsigned int TRANS_UBO;
+    glGenBuffers(1, &TRANS_UBO);
+    glBindBuffer(GL_UNIFORM_BUFFER, TRANS_UBO);
+    glBindBufferBase(GL_UNIFORM_BUFFER, transformBufferId, TRANS_UBO);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(Transform), nullptr, GL_DYNAMIC_DRAW);
+
+
+
 
 
     //Create program and compile GPU kernels
@@ -254,7 +274,9 @@ int main()
 
 
     glm::vec4 projectionDimensions{ -1.0f, 1.0f, -1.0f, 1.0f };
-    projectionMatrix = glm::ortho(projectionDimensions.x, projectionDimensions.y, projectionDimensions.z, projectionDimensions.w, 0.01f, 10.0f);
+    transform.projection = glm::ortho(projectionDimensions.x, projectionDimensions.y, projectionDimensions.z, projectionDimensions.w, 0.01f, 10.0f);
+
+    shaderInput.resolution = windowDimensions;
 
     startTime = std::chrono::high_resolution_clock::now();
     endTime = std::chrono::high_resolution_clock::now() + std::chrono::seconds(30);
@@ -264,6 +286,10 @@ int main()
         t0 = std::chrono::high_resolution_clock::now();
         inputHandler.update();
         
+        shaderInput.mouse = inputHandler.cursor_position();
+        shaderInput.deltaTime = deltaTime;
+        shaderInput.time = totalTime;
+
         glClearColor(backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a);
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -297,8 +323,8 @@ int main()
         rotationMatrix = glm::rotate(rotationMatrix, rotation.y, glm::vec3(1.0f, 0.0f, 0.0f));
         cameraPosition = glm::vec3(rotationMatrix * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 
-        viewMatrix = glm::lookAt(cameraPosition, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        viewMatrix = glm::scale(viewMatrix, glm::vec3(zoom));
+        transform.view = glm::lookAt(cameraPosition, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        transform.view = glm::scale(transform.view, glm::vec3(zoom));
 
         if (hueShift)
         {
@@ -410,11 +436,19 @@ int main()
 
 
 
+
+
+        //Global uniform buffer data
+        glBindBuffer(GL_UNIFORM_BUFFER, INPUT_UBO);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(ShaderInput), &shaderInput);
+
+        glBindBuffer(GL_UNIFORM_BUFFER, TRANS_UBO);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Transform), &transform);
+
+
+
         //Draw gravitors
         gravitorShader.use();
-        gravitorShader.set_mat4("uModel", modelMatrix);
-        gravitorShader.set_mat4("uView", viewMatrix);
-        gravitorShader.set_mat4("uProjection", projectionMatrix);
 
         glPointSize(6);
         glBindVertexArray(GRAV_VAO);
@@ -424,13 +458,7 @@ int main()
 
         //Draw particles
         particleShader.use();
-        particleShader.set_mat4("uModel", modelMatrix);
-        particleShader.set_mat4("uView", viewMatrix);
-        particleShader.set_mat4("uProjection", projectionMatrix);
-
-        particleShader.set_float("uTime", (float)glfwGetTime());
         particleShader.set_vec3("uHSV", hsv);
-        particleShader.set_vec2("uResolution", windowDimensions);
 
         glPointSize((GLfloat)particleSize);
         glBindVertexArray(PART_VAO);
@@ -442,10 +470,11 @@ int main()
 
         t1 = std::chrono::high_resolution_clock::now();
         deltaTime = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(t1 - t0).count() / 1000.0f;
+        totalTime += deltaTime;
         
         ++updateCount;
         frameTimes.push_back(deltaTime);
-        //if (t1 > endTime) break;
+        if (t1 > endTime) break;
     }
 
 
