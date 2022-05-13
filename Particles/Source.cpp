@@ -129,9 +129,9 @@ int main()
     bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
     bool calculateEnergy = false;                                                       //Should energy be calculated every update?
 
-    glm::vec3 hsv{};                                                                    //Hue Saturation Value shift of particle colors
-    glm::vec4 backgroundColor{ 0.1f, 0.1f, 0.1f, 1.0f };                                //Color of the background
-    bool hueShift = false;                                                               //Shift hue with time?
+    glm::vec3 hsv{ 0.0f, 1.0f, 1.0f };                                                  //Hue Saturation Value shift of particle colors
+    glm::vec4 backgroundColor{ 0.1f, 0.1f, 0.1f, 0.5f };                                //Color of the background
+    bool hueShift = false;                                                              //Shift hue with time?
     int particleSize = 1;                                                               //Size of particles
     float scrollMultiplier = 10.0f;
 
@@ -192,7 +192,7 @@ int main()
 
     //Create shared gravitor buffer
     hostGravitorBuffer.resize(GRAVITOR_BUFFER_SIZE);
-    create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f), 0.01f);
+    create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f), 0.1f);
     clGravitorBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, GRAVITOR_BUFFER_SIZE * sizeof(Gravitor), nullptr, &error);
     error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
 
@@ -239,8 +239,10 @@ int main()
 
 
     GeneratorSettings settings{};
-    //settings.color_max = glm::vec4(0.0f, 0.8f, 0.5f, 0.2f);
-    //settings.color_min = glm::vec4(0.0f, 0.2f, 0.1f, 0.2f);
+    settings.color_min = glm::vec4(0.0f, 1.0f, 0.5f, 0.1f);
+    settings.color_max = glm::vec4(0.0f, 1.0f, 0.5f, 0.3f);
+    settings.velocity_min = glm::vec3(0.2f, 0.0f, 0.0f);
+    settings.velocity_max = glm::vec3(0.6f, 0.0f, 0.0f);
 
     //Map GPU memory to a host pointer and generate an initial amount of particles
     error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
@@ -410,9 +412,9 @@ int main()
 
         //Draw gravitors
         gravitorShader.use();
-        gravitorShader.setMat4("uModel", modelMatrix);
-        gravitorShader.setMat4("uView", viewMatrix);
-        gravitorShader.setMat4("uProjection", projectionMatrix);
+        gravitorShader.set_mat4("uModel", modelMatrix);
+        gravitorShader.set_mat4("uView", viewMatrix);
+        gravitorShader.set_mat4("uProjection", projectionMatrix);
 
         glPointSize(6);
         glBindVertexArray(GRAV_VAO);
@@ -422,13 +424,13 @@ int main()
 
         //Draw particles
         particleShader.use();
-        particleShader.setMat4("uModel", modelMatrix);
-        particleShader.setMat4("uView", viewMatrix);
-        particleShader.setMat4("uProjection", projectionMatrix);
+        particleShader.set_mat4("uModel", modelMatrix);
+        particleShader.set_mat4("uView", viewMatrix);
+        particleShader.set_mat4("uProjection", projectionMatrix);
 
-        particleShader.setFloat("uTime", (float)glfwGetTime());
-        particleShader.setVec3("uHSV", hsv);
-        particleShader.setVec2("uResolution", windowDimensions);
+        particleShader.set_float("uTime", (float)glfwGetTime());
+        particleShader.set_vec3("uHSV", hsv);
+        particleShader.set_vec2("uResolution", windowDimensions);
 
         glPointSize((GLfloat)particleSize);
         glBindVertexArray(PART_VAO);

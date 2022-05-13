@@ -1,5 +1,34 @@
 #include "Generators.hpp"
 
+void _particle_generator_line(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
+{
+    SEED_GENERATOR;
+
+    float px, py, pz;
+    float vx, vy, vz;
+    float cr, cg, cb, ca;
+    float en;
+
+    for (size_t i = 0; i < amount; i++)
+    {
+        px = RAND_F(settings.position_min.x, settings.position_max.x);
+        py = RAND_F(settings.position_min.y, settings.position_max.y);
+        pz = RAND_F(settings.position_min.z, settings.position_max.z);
+
+        vx = RAND_F(settings.velocity_min.x, settings.velocity_max.x);
+        vy = RAND_F(settings.velocity_min.y, settings.velocity_max.y);
+        vz = RAND_F(settings.velocity_min.z, settings.velocity_max.z);
+
+        cr = RAND_F(settings.color_min.r, settings.color_max.r);
+        cg = RAND_F(settings.color_min.g, settings.color_max.g);
+        cb = RAND_F(settings.color_min.b, settings.color_max.b);
+        ca = RAND_F(settings.color_min.a, settings.color_max.a);
+
+        en = RAND_F(settings.energy_min, settings.energy_max);
+
+        particles[offset + i] = Particle(glm::vec3(px, py, pz), glm::vec3(vx, vy, vz), glm::vec4(cr, cg, cb, ca), en);
+    }
+}
 void _particle_generator_cube(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
 {
     SEED_GENERATOR;
@@ -24,19 +53,6 @@ void _particle_generator_cube(Particle* particles, size_t offset, size_t amount,
         cb = RAND_F(settings.color_min.b, settings.color_max.b);
         ca = RAND_F(settings.color_min.a, settings.color_max.a);
 
-        //if (px < 0.0f)
-        //{
-        //    cr = 1.0f;
-        //    cg = 0.0f;
-        //}
-        //else
-        //{
-        //    cr = 0.0f;
-        //    cg = 1.0f;
-        //}
-        //cb = 0.0f;
-        //ca = 0.2f;
-
         en = RAND_F(settings.energy_min, settings.energy_max);
 
         particles[offset + i] = Particle(glm::vec3(px, py, pz), glm::vec3(vx, vy, vz), glm::vec4(cr, cg, cb, ca), en);
@@ -47,7 +63,7 @@ void _particle_generator_sphere(Particle* particles, size_t offset, size_t amoun
     SEED_GENERATOR;
 
     float theta, phi;
-    float rx;// , ry, rz;
+    float rx;
 
     float px, py, pz;
     float vx, vy, vz;

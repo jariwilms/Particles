@@ -2,32 +2,18 @@
 
 char* Utils::read_file(const char* filename)
 {
+	FILE* file;
 	char* sourceCode;
 	uint32_t fileLength = 0;
 
-	FILE* fPtr;
-	auto err = fopen_s(&fPtr, filename, "rb");
+	if (!filename || fopen_s(&file, filename, "rb") != 0) return nullptr;
 
-	if (fPtr == nullptr)
-	{
-		std::cout << "Could not read file";
-		exit(EXIT_FAILURE);
-	}
+	fseek(file, 0, SEEK_END);
+	fileLength = ftell(file);
+	rewind(file);
 
-	fseek(fPtr, 0, SEEK_END);
-	fileLength = ftell(fPtr);
-
-	sourceCode = (char*)malloc(sizeof(char) * fileLength + 1);
-
-	if (sourceCode == nullptr)
-	{
-		std::cout << "source code memory allocation returned nullptr";
-		exit(1);
-	}
-
-	rewind(fPtr);
-
-	fread(sourceCode, sizeof(char), fileLength, fPtr);
+	sourceCode = new char[sizeof(char) * fileLength + 1];
+	fread(sourceCode, sizeof(char), fileLength, file);
 	sourceCode[fileLength] = '\0';
 
 	return sourceCode;

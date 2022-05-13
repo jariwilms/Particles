@@ -29,7 +29,7 @@ vec3 hsv_to_rgb(vec3 c)
 void main()
 {
     vec2 uv = gl_FragCoord.xy / uResolution;
-    float distanceFromCenter = distance(uv, vec2(0.5));
+    float distanceFromCenter = distance(uv, vec2(0.5)) * 1.2;
     distanceFromCenter += 0.2;
 
     vec3 centerColor = vec3(0.0, 1.0, 1.0);
@@ -38,11 +38,10 @@ void main()
     vec3 colorHSV = rgb_to_hsv(vertexColor.xyz);
     vec3 colorRGB = hsv_to_rgb(colorHSV + uHSV);
 
-//    fragmentColor = vec4(1.0);
-//    fragmentColor = vec4(uv, 0.0, 1.0);
+//    fragmentColor = vec4(1.0);                                                                                    //White 
+//    fragmentColor = vec4(uv, 0.0, 1.0);                                                                           //UV based
 
-//    fragmentColor = vertexColor;
-    fragmentColor = vec4(colorRGB, vertexColor.a);                                                                  //particle color + hsv
-//    fragmentColor = vec4((1.0 - distanceFromCenter) * centerColor + distanceFromCenter * borderColor, 1.0);
-//    fragmentColor = vec4(vec3(1.0) * distanceFromCenter, 1.0);
+//    fragmentColor = vertexColor;                                                                                  //Particle color
+//    fragmentColor = vec4(colorRGB, vertexColor.a);                                                                //Particle color + HSV 
+    fragmentColor = vec4(mix(centerColor, borderColor, distanceFromCenter), vertexColor.a);                          //Particle color distance dependent + HSV
 } 
