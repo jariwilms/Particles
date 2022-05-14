@@ -72,7 +72,7 @@ void generatorTestFunc()
     exit(1);
 }
 
-int main()
+int main(int argc, char* argv[])
 {
     cl_int error;								                                        //OpenCL error code return
 
@@ -95,8 +95,9 @@ int main()
     bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
     bool calculateEnergy = false;                                                       //Should energy be calculated every update?
 
+    ParticleGenerator generator = nullptr;                                              //Generator function pointer for initial particles
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
-    size_t initialParticles = 10000000;                                                   //Amount of particles to generate at the start of the simulation
+    size_t initialParticles = 1000000;                                                   //Amount of particles to generate at the start of the simulation
     size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
 
     std::vector<Gravitor> hostGravitorBuffer;                                           //Gravitor buffer of static size that remains on the host
@@ -147,6 +148,49 @@ int main()
     float totalTime{};
 
 
+
+    for (int i = 1; i < argc; ++i)
+    {
+        std::string arg = argv[i];
+
+        if (arg == "-l")
+        {
+            std::cout << "generator = _particle_generator_line\n";
+            generator = _particle_generator_line;
+        }
+        else if (arg == "-c")
+        {
+            std::cout << "generator = _particle_generator_cube\n";
+            generator = _particle_generator_cube;
+        }
+        else if (arg == "-s")
+        {
+            std::cout << "generator = _particle_generator_sphere\n";
+            generator = _particle_generator_sphere;
+        }
+        else if (arg == "-pc")
+        {
+            std::string val = argv[i + 1];
+            int num = std::stoi(val);
+
+            if (num != 0)
+            {
+                std::cout << "particle count = " << val << '\n';
+                initialParticles = num;
+            }
+
+            ++i;
+        }
+        else if (arg == "-e")
+        {
+            std::cout << "energy calculation on\n";
+            calculateEnergy = true;
+        }
+        else
+        {
+            std::cout << "Invalid command line argument entered: " << arg << '\n';
+        }
+    }
 
 
 
@@ -259,15 +303,13 @@ int main()
 
 
     GeneratorSettings settings{};
-    settings.color_min = glm::vec4(0.0f, 1.0f, 0.5f, 0.1f);
-    settings.color_max = glm::vec4(0.0f, 1.0f, 0.5f, 0.3f);
-    settings.velocity_min = glm::vec3(0.2f, 0.0f, 0.0f);
-    settings.velocity_max = glm::vec3(0.6f, 0.0f, 0.0f);
+    settings.color_min = glm::vec4(0.0f, 1.0f, 0.0f, 0.1f);
+    settings.color_max = glm::vec4(0.0f, 1.0f, 1.0f, 0.1f);
 
     //Map GPU memory to a host pointer and generate an initial amount of particles
     error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
     Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_WRITE_ONLY, 0, initialParticles * sizeof(Particle), 0, nullptr, nullptr, &error);
-    Emitter::GenerateOnce(particles, particleCount, initialParticles, _particle_generator_cube, settings);
+    Emitter::GenerateOnce(particles, particleCount, initialParticles, generator, settings);
     clEnqueueUnmapMemObject(commandQueue, clParticleBuffer, particles, 0, nullptr, nullptr);
     error = clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 

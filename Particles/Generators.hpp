@@ -19,11 +19,11 @@
 extern const size_t PARTICLE_BUFFER_SIZE;
 extern const size_t GRAVITOR_BUFFER_SIZE;
 
-using ParticleGenerator = void(*)(Particle* particles, size_t particleCount, size_t amount, GeneratorSettings settings);
-
 #define _P_GEN_SIG Particle* particles, size_t offset, size_t amount, GeneratorSettings settings
 #define GEN_SIG Particle* particles, size_t& particleCount, size_t amount, ParticleGenerator generator, GeneratorSettings settings
+
 // https://www.youtube.com/watch?v=UvZjzKOpdVM
+using ParticleGenerator = void(*)(_P_GEN_SIG);
 
 void _particle_generator_line(_P_GEN_SIG);
 void _particle_generator_cube(_P_GEN_SIG);
