@@ -50,11 +50,14 @@ As you can see, moving data between the CPU and GPU causes a large performance l
 * Zoom in/out
 
 The following command-line arguments are supported:  
--particles {} => Initial particle count  
--energy {} => particle lifetime  
--line => Line formation  
--cube => Cube formation  
--sphere => Sphere formation  
+| Argument    | Description                |
+|-------------|----------------------------|
+| -p AMOUNT   | Initial particle count     |
+| -e LIFETIME | How long a particle lives  |
+| -l          | N/A                        |
+| -c          | N/A                        |
+| -s          | N/A                        |
+| -b DURATION | Benchmark duration seconds |
 
 ## Libraries
 The following libraries were used: 
