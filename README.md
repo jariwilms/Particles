@@ -21,8 +21,8 @@ The table below shows the average framerate for a given particle count.
 |  1 000 000 |     64.97 |    15.39ms |     yes |
 |  3 000 000 |    155.32 |     6.44ms |      no |
 |  3 000 000 |     26.87 |    37.22ms |     yes |
-|  5 000 000 |     98.61 |    10.14ms |      no |
-| 10 000 000 |     52.32 |    19.11ms |      no |
+|  5 000 000 |    109.36 |     9.14ms |      no |
+| 10 000 000 |     58.75 |    17.02ms |      no |
 
 As you can see, moving data between the CPU and GPU causes a large performance loss, even for small amounts.  
 
@@ -42,6 +42,19 @@ As you can see, moving data between the CPU and GPU causes a large performance l
 * [ESC] exit
 
 ## Features
+* Rotate the camera around the origin
+* Create new gravitors/repulsors
+* Shift particle HSV
+* Shift background RGB
+* Pause the simulation
+* Zoom in/out
+
+The following command-line arguments are supported:  
+-particles {} => Initial particle count  
+-energy {} => particle lifetime  
+-line => Line formation  
+-cube => Cube formation  
+-sphere => Sphere formation  
 
 ## Libraries
 The following libraries were used: 
