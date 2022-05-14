@@ -15,7 +15,7 @@ The table below shows the average framerate for a given particle count.
 
 |  Particles | Framerate |  Frametime | Energy? |
 |:----------:|:---------:|:----------:|:-------:|
-|    100 000 |   1370.69 |     0.73ms |      no |
+|    100 000 |   1408.64 |     0.71ms |      no |
 |    100 000 |    359.85 |     2.78ms |     yes |
 |  1 000 000 |    413.63 |     2.42ms |      no |
 |  1 000 000 |     64.97 |    15.39ms |     yes |
