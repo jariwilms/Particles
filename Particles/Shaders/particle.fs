@@ -37,7 +37,7 @@ void main()
 {
     vec2 uv = gl_FragCoord.xy / resolution;
     float distanceFromCenter = distance(uv, vec2(0.5));
-    float centerOffset = 0.2;
+    float centerOffset = 0.3;
 
     vec3 centerColor = vec3(0.0, 1.0, 1.0);
     vec3 borderColor = vec3(1.0, 0.0, 1.0);

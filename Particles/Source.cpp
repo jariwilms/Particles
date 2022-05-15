@@ -147,6 +147,7 @@ int main(int argc, char* argv[])
     float benchmarkDuration{};
 
 
+
     for (int i = 1; i < argc; ++i)
     {
         std::string arg = argv[i];
@@ -158,7 +159,7 @@ int main(int argc, char* argv[])
 
             if (num != 0)
             {
-                std::cout << "particle count = " << val << '\n';
+                std::cout << "particle count: " << val << '\n';
                 initialParticles = num;
             }
 
@@ -189,17 +190,17 @@ int main(int argc, char* argv[])
             {
                 if (val == "l")
                 {
-                    std::cout << "generator = line\n";
+                    std::cout << "generator: line\n";
                     generator = _particle_generator_line;
                 }
                 else if (val == "c")
                 {
-                    std::cout << "generator = cube\n";
+                    std::cout << "generator: cube\n";
                     generator = _particle_generator_cube;
                 }
                 else if (val == "s")
                 {
-                    std::cout << "generator = sphere\n";
+                    std::cout << "generator: sphere\n";
                     generator = _particle_generator_sphere;
                 }
             }
@@ -214,7 +215,7 @@ int main(int argc, char* argv[])
 
             if (num != 0)
             {
-                std::cout << "benchmark duration: " << val << "seconds\n";
+                std::cout << "benchmark duration: " << val << "s\n";
                 benchmarkDuration = (float)num;
             }
 
@@ -223,6 +224,7 @@ int main(int argc, char* argv[])
         else
         {
             std::cout << "Invalid command line argument entered: " << arg << '\n';
+            std::exit(EXIT_FAILURE);
         }
     }
 
@@ -273,7 +275,7 @@ int main(int argc, char* argv[])
     //Create shared gravitor buffer
     hostGravitorBuffer.resize(GRAVITOR_BUFFER_SIZE);
     clGravitorBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, GRAVITOR_BUFFER_SIZE * sizeof(Gravitor), nullptr, &error);
-#ifndef MOUSE_GRAV
+#if !MOUSE_GRAV
     create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f), 0.1f);
     error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
 #endif // !MOUSE_GRAV
@@ -324,7 +326,7 @@ int main(int argc, char* argv[])
 
     kernelMV = clCreateKernel(program, "calculate_movement_single", &error);
     check_kernel_compile_error(error, program, deviceId, __LINE__);
-#ifdef ALT_GRAVITY
+#if ALT_GRAVITY
     kernelGV = clCreateKernel(program, "calculate_gravity_single_alt", &error);
 #else
     kernelGV = clCreateKernel(program, "calculate_gravity_single", &error);
@@ -412,8 +414,7 @@ int main(int argc, char* argv[])
         {
             hsv.x += deltaTime * 0.01f;
         }
-
-#ifdef MOUSE_GRAV
+#if MOUSE_GRAV
         if (inputHandler.is_button_pressed(SPAWN_GRAVITOR_INPUT) || inputHandler.is_button_pressed(SPAWN_REPULSOR_INPUT))
         {
             glm::vec2 screenPosition = glm::vec2(inputHandler.cursor_position() / windowDimensions);
@@ -456,8 +457,6 @@ int main(int argc, char* argv[])
             glBufferSubData(GL_ARRAY_BUFFER, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data());
         }
 #endif // MOUSE_GRAV
-
-
         if (inputHandler.is_key_pressed_once(TOGGLE_MOVEMENT_INPUT)) calculateMovement = !calculateMovement;
         if (inputHandler.is_key_pressed_once(TOGGLE_GRAVITY_INPUT)) calculateGravity = !calculateGravity;
         if (inputHandler.is_key_pressed_once(INCREASE_POINT_SIZE_INPUT))

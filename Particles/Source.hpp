@@ -59,5 +59,5 @@ const size_t GRAVITOR_BUFFER_SIZE = 8;
 
 #define CLOSE_WINDOW_KEY GLFW_KEY_ESCAPE
 
-#define MOUSE_GRAV 1
+#define MOUSE_GRAV 0
 #define ALT_GRAVITY 0

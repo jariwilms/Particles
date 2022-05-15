@@ -1,5 +1,5 @@
 # Particles
-Simulate millions of particles simultaneously
+Simulate millions of particles simultaneously on the GPU
 
 ## Properties
 * Allocates an OpenGL vertex buffer which is shared by OpenCL
@@ -24,7 +24,7 @@ The table below shows the average framerate for a given particle count.
 |  5 000 000 |    109.36 |     9.14ms |      no |
 | 10 000 000 |     58.75 |    17.02ms |      no |
 
-As you can see, moving data between the CPU and GPU causes a large performance loss, even for small amounts.  
+As you can see, moving data between the CPU and GPU causes a large performance loss, even for small amounts of data.  
 
 ## Controls
 * [M1] place gravitor
@@ -41,7 +41,7 @@ As you can see, moving data between the CPU and GPU causes a large performance l
 * [ESC] exit
 
 Hue shifting is not enabled by default.  
-You will need to change several settings in the 'OpenGL.cpp' and 'particle.fs' to make it work.
+You need to change a few settings in 'OpenGL.cpp' and 'particle.fs' to make it work.
 * [SCROLL+F] change hue
 * [SCROLL+G] change saturation
 * [SCROLL+H] change value
@@ -59,14 +59,18 @@ The following command-line arguments are supported:
 |-------------|----------------------------|
 | -p AMOUNT   | Initial particle count     |
 | -e LIFETIME | How long a particle lives  |
-| -l          | N/A                        |
-| -c          | N/A                        |
-| -s          | N/A                        |
+| -g GEN      | Choose generator (l/c/s)   |
 | -b DURATION | Benchmark duration seconds |
 
+## Preview
+![Spiral](Screenshots/Spiral.png)<br><br>
+![Distance Based Fragment shader](Screenshots/Distance-based.png)<br><br>
+![Rainbow Sphere](Screenshots/Rainbow%20Sphere.png)<br><br>
+![Alternate Gravity](Screenshots/Alternate%20Gravity.png)<br><br>
+
 ## Libraries
-The following libraries were used: 
+The following libraries were used:  
 * OpenCL
-* GLFW
+* OpenGL (GLFW)
 * GLAD
 * GLM
