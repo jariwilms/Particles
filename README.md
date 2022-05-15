@@ -31,15 +31,20 @@ As you can see, moving data between the CPU and GPU causes a large performance l
 * [M2] place repulsor
 * [WASD] rotate scene
 * [SCROLL] change zoom level
-* [SCROLL+F] change hue
-* [SCROLL+G] change saturation
-* [SCROLL+H] change value
 * [SCROLL+V] change background R
 * [SCROLL+B] change background G
 * [SCROLL+B] change background B
+* [KEYPAD +] increase particle size
+* [KEYPAD -] decrease particle size
 * [P] toggle movement
 * [C] toggle gravity
 * [ESC] exit
+
+Hue shifting is not enabled by default.  
+You will need to change several settings in the 'OpenGL.cpp' and 'particle.fs' to make it work.
+* [SCROLL+F] change hue
+* [SCROLL+G] change saturation
+* [SCROLL+H] change value
 
 ## Features
 * Rotate the camera around the origin
