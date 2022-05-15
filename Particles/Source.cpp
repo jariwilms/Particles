@@ -95,7 +95,6 @@ int main(int argc, char* argv[])
     bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
     bool calculateEnergy = false;                                                       //Should energy be calculated every update?
 
-    ParticleGenerator generator = nullptr;                                              //Generator function pointer for initial particles
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
     size_t initialParticles = 1000000;                                                   //Amount of particles to generate at the start of the simulation
     size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
@@ -106,8 +105,8 @@ int main(int argc, char* argv[])
     size_t gravitorCount{};                                                             //Amount of gravitors = > separate variable to prevent host / GPU buffer resizing (kinda useless because GRAVITOR_BUFFER_SIZE is 8
 
     std::vector<Emitter*> emitters{};                                                   //Vector of particle emitters
-
-
+    ParticleGenerator generator = _particle_generator_cube;                             //Generator function pointer for initial particles
+    GeneratorSettings settings{};
 
 
 
@@ -129,9 +128,8 @@ int main(int argc, char* argv[])
 
 
 
-
     glm::vec3 hsv{ 0.0f, 1.0f, 1.0f };                                                  //Hue Saturation Value shift of particle colors
-    glm::vec4 backgroundColor{ 0.1f, 0.1f, 0.1f, 0.5f };                                //Color of the background
+    glm::vec4 backgroundColor{ 0.1f, 0.1f, 0.1f, 0.0f };                                //Color of the background
     bool hueShift = false;                                                              //Shift hue with time?
     int particleSize = 1;                                                               //Size of particles
     float scrollMultiplier = 10.0f;
@@ -146,29 +144,14 @@ int main(int argc, char* argv[])
     unsigned int updateCount{};                                                         //Total amount of updates the simulation has done
     float deltaTime{};                                                                  //Elapsed time between each update
     float totalTime{};
-
+    float benchmarkDuration{};
 
 
     for (int i = 1; i < argc; ++i)
     {
         std::string arg = argv[i];
 
-        if (arg == "-l")
-        {
-            std::cout << "generator = _particle_generator_line\n";
-            generator = _particle_generator_line;
-        }
-        else if (arg == "-c")
-        {
-            std::cout << "generator = _particle_generator_cube\n";
-            generator = _particle_generator_cube;
-        }
-        else if (arg == "-s")
-        {
-            std::cout << "generator = _particle_generator_sphere\n";
-            generator = _particle_generator_sphere;
-        }
-        else if (arg == "-pc")
+        if (arg == "-p")
         {
             std::string val = argv[i + 1];
             int num = std::stoi(val);
@@ -183,8 +166,59 @@ int main(int argc, char* argv[])
         }
         else if (arg == "-e")
         {
-            std::cout << "energy calculation on\n";
+            std::cout << "energy enabled\n";
             calculateEnergy = true;
+
+            std::string val = argv[i + 1];
+            int num = std::stoi(val);
+
+            if (num != 0)
+            {
+                std::cout << "particle energy: " << val << '\n';
+                settings.energy_min = 0.0f;
+                settings.energy_max = float(num);
+            }
+
+            ++i;
+        }
+        else if (arg == "-g")
+        {
+            std::string val = argv[i + 1];
+
+            if (val.length() != 0)
+            {
+                if (val == "l")
+                {
+                    std::cout << "generator = line\n";
+                    generator = _particle_generator_line;
+                }
+                else if (val == "c")
+                {
+                    std::cout << "generator = cube\n";
+                    generator = _particle_generator_cube;
+                }
+                else if (val == "s")
+                {
+                    std::cout << "generator = sphere\n";
+                    generator = _particle_generator_sphere;
+                }
+            }
+
+            ++i;
+        }
+        else if (arg == "-b")
+        {
+            std::cout << "benchmark enabled\n";
+            std::string val = argv[i + 1];
+            int num = std::stoi(val);
+
+            if (num != 0)
+            {
+                std::cout << "benchmark duration: " << val << "seconds\n";
+                benchmarkDuration = (float)num;
+            }
+
+            ++i;
         }
         else
         {
@@ -238,9 +272,11 @@ int main(int argc, char* argv[])
 
     //Create shared gravitor buffer
     hostGravitorBuffer.resize(GRAVITOR_BUFFER_SIZE);
-    create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f), 0.1f);
     clGravitorBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, GRAVITOR_BUFFER_SIZE * sizeof(Gravitor), nullptr, &error);
+#ifndef MOUSE_GRAV
+    create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f), 0.1f);
     error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
+#endif // !MOUSE_GRAV
 
     unsigned int GRAV_VAO, GRAV_VBO;
     glGenVertexArrays(1, &GRAV_VAO);
@@ -288,7 +324,11 @@ int main(int argc, char* argv[])
 
     kernelMV = clCreateKernel(program, "calculate_movement_single", &error);
     check_kernel_compile_error(error, program, deviceId, __LINE__);
+#ifdef ALT_GRAVITY
+    kernelGV = clCreateKernel(program, "calculate_gravity_single_alt", &error);
+#else
     kernelGV = clCreateKernel(program, "calculate_gravity_single", &error);
+#endif // ALT_GRAVITY
     check_kernel_compile_error(error, program, deviceId, __LINE__);
     kernelEN = clCreateKernel(program, "calculate_energy_single", &error);
     check_kernel_compile_error(error, program, deviceId, __LINE__);
@@ -302,11 +342,11 @@ int main(int argc, char* argv[])
 
 
 
-    GeneratorSettings settings{};
-    settings.color_min = glm::vec4(0.0f, 1.0f, 0.0f, 0.1f);
-    settings.color_max = glm::vec4(0.0f, 1.0f, 1.0f, 0.1f);
+    settings.color_min = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    settings.color_max = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
     //Map GPU memory to a host pointer and generate an initial amount of particles
+    std::srand((unsigned int)time((time_t*)nullptr));
     error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
     Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_WRITE_ONLY, 0, initialParticles * sizeof(Particle), 0, nullptr, nullptr, &error);
     Emitter::GenerateOnce(particles, particleCount, initialParticles, generator, settings);
@@ -321,7 +361,7 @@ int main(int argc, char* argv[])
     shaderInput.resolution = windowDimensions;
 
     startTime = std::chrono::high_resolution_clock::now();
-    endTime = std::chrono::high_resolution_clock::now() + std::chrono::seconds(30);
+    endTime = std::chrono::high_resolution_clock::now() + std::chrono::seconds((int)benchmarkDuration);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -372,6 +412,32 @@ int main(int argc, char* argv[])
         {
             hsv.x += deltaTime * 0.01f;
         }
+
+#ifdef MOUSE_GRAV
+        if (inputHandler.is_button_pressed(SPAWN_GRAVITOR_INPUT) || inputHandler.is_button_pressed(SPAWN_REPULSOR_INPUT))
+        {
+            glm::vec2 screenPosition = glm::vec2(inputHandler.cursor_position() / windowDimensions);
+            glm::vec2 absolutePosition = glm::vec2(screenPosition.x, -screenPosition.y) * 2.0f + glm::vec2(projectionDimensions.x, projectionDimensions.w);
+            glm::vec4 rotatedPosition = rotationMatrix * glm::vec4(absolutePosition / zoom, 0.0f, 0.0f);
+
+            float gravity = 0.0f;
+            if (inputHandler.is_button_pressed(SPAWN_GRAVITOR_INPUT)) gravity = 1.0f;
+            if (inputHandler.is_button_pressed(SPAWN_REPULSOR_INPUT)) gravity = -1.0f;
+
+            hostGravitorBuffer[0] = Gravitor(rotatedPosition, glm::vec3(0.0f), glm::vec4(1.0f), gravity);
+            gravitorCount = 1;
+
+            error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
+
+            glBindVertexArray(GRAV_VAO);
+            glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data());
+        }
+        else
+        {
+            gravitorCount = 0;
+        }
+#else
         if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT) || inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT))
         {
             glm::vec2 screenPosition = glm::vec2(inputHandler.cursor_position() / windowDimensions);
@@ -379,15 +445,19 @@ int main(int argc, char* argv[])
             glm::vec4 rotatedPosition = rotationMatrix * glm::vec4(absolutePosition / zoom, 0.0f, 0.0f);
 
             float gravity = 0.0f;
-            if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT)) gravity = 0.1f;
-            if (inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT)) gravity = -0.1f;
-            create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(rotatedPosition.x, rotatedPosition.y, rotatedPosition.z), gravity);
+            if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT)) gravity = 1.0f;
+            if (inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT)) gravity = -1.0f;
+
+            create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(rotatedPosition), gravity);
+            error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
 
             glBindVertexArray(GRAV_VAO);
             glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
             glBufferSubData(GL_ARRAY_BUFFER, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data());
-            error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
         }
+#endif // MOUSE_GRAV
+
+
         if (inputHandler.is_key_pressed_once(TOGGLE_MOVEMENT_INPUT)) calculateMovement = !calculateMovement;
         if (inputHandler.is_key_pressed_once(TOGGLE_GRAVITY_INPUT)) calculateGravity = !calculateGravity;
         if (inputHandler.is_key_pressed_once(INCREASE_POINT_SIZE_INPUT))
@@ -402,7 +472,7 @@ int main(int argc, char* argv[])
         if (inputHandler.scroll_direction().y)
         {
             float scrollValueY = inputHandler.scroll_direction().y;
-            scrollValueY *= scrollMultiplier;
+            float scrollValueYMultiplied = scrollValueY * scrollMultiplier;
 
             if (inputHandler.is_key_pressed(CHANGE_HUE_INPUT))
             {
@@ -413,35 +483,39 @@ int main(int argc, char* argv[])
             {
                 hsv.y += scrollValueY * deltaTime;
                 hsv.y = std::clamp(hsv.y, -1.0f, 1.0f);
+                std::cout << "S: " << hsv.y << '\n';
             }
             else if (inputHandler.is_key_pressed(CHANGE_VALUE_INPUT))
             {
                 hsv.z += scrollValueY * deltaTime;
                 hsv.z = std::clamp(hsv.z, -1.0f, 1.0f);
+                std::cout << "V: " << hsv.z << '\n';
             }
             else if (inputHandler.is_key_pressed(CHANGE_BACKGROUND_R_INPUT))
             {
-                backgroundColor.r += scrollValueY * deltaTime;
+                backgroundColor.r += scrollValueYMultiplied * deltaTime;
                 backgroundColor.r = std::min(backgroundColor.r, 1.0f);
                 backgroundColor.r = std::max(backgroundColor.r, 0.0f);
             }
             else if (inputHandler.is_key_pressed(CHANGE_BACKGROUND_G_INPUT))
             {
-                backgroundColor.g += scrollValueY * deltaTime;
+                backgroundColor.g += scrollValueYMultiplied * deltaTime;
                 backgroundColor.g = std::min(backgroundColor.g, 1.0f);
                 backgroundColor.g = std::max(backgroundColor.g, 0.0f);
             }
             else if (inputHandler.is_key_pressed(CHANGE_BACKGROUND_B_INPUT))
             {
-                backgroundColor.b += scrollValueY * deltaTime;
+                backgroundColor.b += scrollValueYMultiplied * deltaTime;
                 backgroundColor.b = std::min(backgroundColor.b, 1.0f);
                 backgroundColor.b = std::max(backgroundColor.b, 0.0f);
             }
             else
             {
-                zoom += scrollValueY * 0.01f;
+                zoom += scrollValueY * 0.1f;
                 zoom = std::clamp(zoom, 0.1f, 100.0f);
             }
+
+            particleShader.set_vec3("uHSV", hsv);
         }
 
         if (calculateEnergy)
@@ -491,7 +565,6 @@ int main(int argc, char* argv[])
 
         //Draw gravitors
         gravitorShader.use();
-
         glPointSize(6);
         glBindVertexArray(GRAV_VAO);
         glDrawArrays(GL_POINTS, 0, (GLsizei)gravitorCount);
@@ -500,11 +573,11 @@ int main(int argc, char* argv[])
 
         //Draw particles
         particleShader.use();
-        particleShader.set_vec3("uHSV", hsv);
-
         glPointSize((GLfloat)particleSize);
         glBindVertexArray(PART_VAO);
         glDrawArrays(GL_POINTS, 0, (GLsizei)particleCount);
+
+
 
 
 
@@ -516,10 +589,8 @@ int main(int argc, char* argv[])
         
         ++updateCount;
         frameTimes.push_back(deltaTime);
-        if (t1 > endTime) break;
+        if (benchmarkDuration && t1 > endTime) break;
     }
-
-
 
     auto now = std::chrono::high_resolution_clock::now();
     float timeElapsed = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(now - startTime).count() / 1000.0f;

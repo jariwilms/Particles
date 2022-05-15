@@ -36,20 +36,20 @@ vec3 hsv_to_rgb(vec3 c)
 void main()
 {
     vec2 uv = gl_FragCoord.xy / resolution;
-//    float distanceFromCenter = distance(uv, vec2(0.5)) * 1.2;
-//    distanceFromCenter += 0.2;
+    float distanceFromCenter = distance(uv, vec2(0.5));
+    float centerOffset = 0.2;
 
-//    vec3 centerColor = vec3(0.0, 1.0, 1.0);
-//    vec3 borderColor = vec3(1.0, 0.0, 1.0);
+    vec3 centerColor = vec3(0.0, 1.0, 1.0);
+    vec3 borderColor = vec3(1.0, 0.0, 1.0);
 
-    vec3 colorHSV = rgb_to_hsv(vertexColor.xyz);
-    vec3 colorRGB = hsv_to_rgb(colorHSV + uHSV);
+    fragmentColor = vec4(mix(centerColor, borderColor, distanceFromCenter + centerOffset), 1.0);
 
-//    fragmentColor = vec4(1.0);                                                                                    //White 
-//    fragmentColor = vec4(uv, 0.0, 1.0);                                                                           //UV based
+//    vec3 colorHSV = rgb_to_hsv(vertexColor.xyz * vertexColor.a);
+//    vec3 colorRGB = hsv_to_rgb(colorHSV + uHSV);
 
-//    fragmentColor = vertexColor;                                                                                  //Particle color
-    fragmentColor = vec4(colorRGB, vertexColor.a);                                                                //Particle color + HSV 
-//    fragmentColor = vec4(mix(centerColor, borderColor, distanceFromCenter), vertexColor.a);                          //Particle color distance dependent + HSV} 
-//    fragmentColor = vec4(mix(centerColor, borderColor, distanceFromCenter + abs((mouse.x / resolution.x) * 2.0 - 1.0) ), vertexColor.a);                          //Particle color distance dependent + HSV
+//    fragmentColor = vec4(vec2(uv), 0.0, 1.0);
+//    fragmentColor = vertexColor;                                                                
+//    fragmentColor = vec4(vertexColor.a);
+//    fragmentColor = vec4(colorRGB, 1.0);
+//    fragmentColor = vec4(mix(centerColor, borderColor * vec3(abs(mouse/ resolution * 2.0 - 1.0) * uv, 0.0), distanceFromCenter), vertexColor.a);
 }

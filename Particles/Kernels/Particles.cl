@@ -75,17 +75,39 @@ __kernel void calculate_gravity_single(__global Particle* particles, int particl
 	float dx, dy, dz;
 	float inv_r;
 
-	for (int j = 0; j < gravitorCount; ++j)
+	for (int i = 0; i < gravitorCount; ++i)
 	{
-		dx = gravitors[j].px - particles[index].px;
-		dy = gravitors[j].py - particles[index].py;
-		dz = gravitors[j].pz - particles[index].pz;
+		dx = gravitors[i].px - particles[index].px;
+		dy = gravitors[i].py - particles[index].py;
+		dz = gravitors[i].pz - particles[index].pz;
 
 		inv_r = rsqrt(dx * dx + dy * dy + dz * dz);
 
-		particles[index].vx += gravitors[j].gv * inv_r * dx * deltaTime;
-		particles[index].vy += gravitors[j].gv * inv_r * dy * deltaTime;
-		particles[index].vz += gravitors[j].gv * inv_r * dz * deltaTime;
+		particles[index].vx += gravitors[i].gv * inv_r * dx * deltaTime;
+		particles[index].vy += gravitors[i].gv * inv_r * dy * deltaTime;
+		particles[index].vz += gravitors[i].gv * inv_r * dz * deltaTime;
+	}
+}
+__kernel void calculate_gravity_single_alt(__global Particle* particles, int particleCount, __global Gravitor* gravitors, int gravitorCount, float deltaTime)
+{
+	int index = get_global_id(0) + get_global_id(1) * get_global_size(0);
+
+	float dx, dy, dz;
+	float inv_r;
+
+	for (int i = 0; i < gravitorCount; ++i)
+	{
+		const int G = 1;
+		const int EARTH_MASS = 10;
+
+		float3 partPos = (float3)(particles[index].px, particles[index].py, particles[index].pz);
+		float3 gravPos = (float3)(gravitors[i].px, gravitors[i].py, gravitors[i].pz);
+
+		float3 r = partPos - gravPos;
+		float3 F = G * EARTH_MASS * normalize(r) / -pow(length(r), 2);
+		particles[index].vx += F.x * 0.1f * deltaTime;
+		particles[index].vy += F.y * 0.1f * deltaTime;
+		particles[index].vz += F.z * 0.1f * deltaTime;
 	}
 }
 __kernel void calculate_gravity_looped(__global Particle* particles, int particleCount, __global Gravitor* gravitors, int gravitorCount, float deltaTime)
@@ -127,25 +149,6 @@ __kernel void calculate_energy_looped(__global Particle* particles, int particle
 		particles[i].en -= deltaTime;
 	}
 }
-
-//Alternative gravity simulation, gives a different effect
-//for (int i = globalId; i < particleCount; i += stride)
-//{
-//	const int G = 1;
-//	const int EARTH_MASS = 10;
-//
-//	for (int j = 0; j < gravitorCount; ++j)
-//	{
-//		float2 partPos = (float2)(particles[i].px, particles[i].py);
-//		float2 gravPos = (float2)(gravitors[j].px, gravitors[j].py);
-//
-//		float2 r = partPos - gravPos;
-//		float2 F = G * EARTH_MASS * normalize(r) / -pow(length(r), 2);
-//
-//		particles[i].vx += F.x * deltaTime;
-//		particles[i].vy += F.y * deltaTime;
-//	}
-//}
 
 //DEPRECATED || transferring the particle array and computing it on the cpu is a lot faster
 //__kernel void remove_dead_particles(__global Particle* particles, __global int* particleCount)

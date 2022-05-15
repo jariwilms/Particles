@@ -2,8 +2,6 @@
 
 void _particle_generator_line(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
 {
-    SEED_GENERATOR;
-
     float px, py, pz;
     float vx, vy, vz;
     float cr, cg, cb, ca;
@@ -12,7 +10,7 @@ void _particle_generator_line(Particle* particles, size_t offset, size_t amount,
     for (size_t i = 0; i < amount; i++)
     {
         px = RAND_F(settings.position_min.x, settings.position_max.x);
-        py = RAND_F(settings.position_min.y, settings.position_max.y);
+        py = 0.5f;//py = RAND_F(settings.position_min.y, settings.position_max.y);
         pz = RAND_F(settings.position_min.z, settings.position_max.z);
 
         vx = RAND_F(settings.velocity_min.x, settings.velocity_max.x);
@@ -31,8 +29,6 @@ void _particle_generator_line(Particle* particles, size_t offset, size_t amount,
 }
 void _particle_generator_cube(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
 {
-    SEED_GENERATOR;
-
     float px, py, pz;
     float vx, vy, vz;
     float cr, cg, cb, ca;
@@ -60,8 +56,6 @@ void _particle_generator_cube(Particle* particles, size_t offset, size_t amount,
 }
 void _particle_generator_sphere(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
 {
-    SEED_GENERATOR;
-
     float theta, phi;
     float rx;
 
@@ -96,8 +90,6 @@ void _particle_generator_sphere(Particle* particles, size_t offset, size_t amoun
 }
 void _particle_generator_cone(Particle* particles, size_t offset, size_t amount, GeneratorSettings settings)
 {
-    SEED_GENERATOR;
-
     float an;
 
     float px, py, pz;

@@ -13,11 +13,10 @@
 #include "Particle.hpp"
 #include "GeneratorSettings.hpp"
 
-#define SEED_GENERATOR std::srand((unsigned int)time((time_t*)nullptr))
-#define RAND_F(min, max) (min + std::rand() / (RAND_MAX / (max - min)))
-
 extern const size_t PARTICLE_BUFFER_SIZE;
 extern const size_t GRAVITOR_BUFFER_SIZE;
+
+#define RAND_F(min, max) (min + std::rand() / (RAND_MAX / (max - min)))
 
 #define _P_GEN_SIG Particle* particles, size_t offset, size_t amount, GeneratorSettings settings
 #define GEN_SIG Particle* particles, size_t& particleCount, size_t amount, ParticleGenerator generator, GeneratorSettings settings
