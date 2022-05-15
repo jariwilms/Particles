@@ -15,7 +15,7 @@ The table below shows the average framerate for a given particle count.
 
 |  Particles | Framerate |  Frametime | Energy? |
 |:----------:|:---------:|:----------:|:-------:|
-|    100 000 |   1370.69 |     0.73ms |      no |
+|    100 000 |   1408.64 |     0.71ms |      no |
 |    100 000 |    359.85 |     2.78ms |     yes |
 |  1 000 000 |    413.63 |     2.42ms |      no |
 |  1 000 000 |     64.97 |    15.39ms |     yes |
@@ -31,15 +31,20 @@ As you can see, moving data between the CPU and GPU causes a large performance l
 * [M2] place repulsor
 * [WASD] rotate scene
 * [SCROLL] change zoom level
-* [SCROLL+F] change hue
-* [SCROLL+G] change saturation
-* [SCROLL+H] change value
 * [SCROLL+V] change background R
 * [SCROLL+B] change background G
 * [SCROLL+B] change background B
+* [KEYPAD +] increase particle size
+* [KEYPAD -] decrease particle size
 * [P] toggle movement
 * [C] toggle gravity
 * [ESC] exit
+
+Hue shifting is not enabled by default.  
+You will need to change several settings in the 'OpenGL.cpp' and 'particle.fs' to make it work.
+* [SCROLL+F] change hue
+* [SCROLL+G] change saturation
+* [SCROLL+H] change value
 
 ## Features
 * Rotate the camera around the origin
@@ -50,11 +55,14 @@ As you can see, moving data between the CPU and GPU causes a large performance l
 * Zoom in/out
 
 The following command-line arguments are supported:  
--particles {} => Initial particle count  
--energy {} => particle lifetime  
--line => Line formation  
--cube => Cube formation  
--sphere => Sphere formation  
+| Argument    | Description                |
+|-------------|----------------------------|
+| -p AMOUNT   | Initial particle count     |
+| -e LIFETIME | How long a particle lives  |
+| -l          | N/A                        |
+| -c          | N/A                        |
+| -s          | N/A                        |
+| -b DURATION | Benchmark duration seconds |
 
 ## Libraries
 The following libraries were used: 
