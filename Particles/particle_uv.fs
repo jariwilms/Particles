@@ -19,5 +19,5 @@ void main()
 {
     vec2 uv = gl_FragCoord.xy / resolution;
 
-    fragmentColor = vertexColor;                                                                
+    fragmentColor = vec4(vec2(uv), 0.0, 1.0);
 }

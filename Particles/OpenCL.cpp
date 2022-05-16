@@ -237,10 +237,5 @@ void setup_cl(cl_platform_id& platformId, cl_device_id& deviceId, cl_context& co
     };
 
     context = clCreateContext(properties, numDevices, &deviceId, nullptr, nullptr, &error);
-
-#if DEBUG
-    commandQueue = clCreateCommandQueue(context, deviceId, CL_QUEUE_PROFILING_ENABLE, &error);
-#else
     commandQueue = clCreateCommandQueue(context, deviceId, NULL, &error);
-#endif
 }

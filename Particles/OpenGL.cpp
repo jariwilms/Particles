@@ -26,7 +26,6 @@ GLFWwindow* setup_gl(glm::uvec2 windowDimensions)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     //Other blending options. Does not work with every fragment shader option, so you need to mix & match a bit
-    //glBlendFunc(GL_ONE, GL_ONE);
     //glBlendFunc(GL_SRC_ALPHA, GL_ONE);
     //glBlendFunc(GL_SRC_ALPHA, GL_DST_COLOR);
     //glBlendFunc(GL_SRC_COLOR, GL_DST_ALPHA);

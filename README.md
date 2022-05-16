@@ -55,17 +55,23 @@ You need to change a few settings in 'OpenGL.cpp' and 'particle.fs' to make it w
 * Zoom in/out
 
 The following command-line arguments are supported:  
-| Argument    | Description                |
-|-------------|----------------------------|
-| -p AMOUNT   | Initial particle count     |
-| -e LIFETIME | How long a particle lives  |
-| -g GEN      | Choose generator (l/c/s)   |
-| -b DURATION | Benchmark duration seconds |
+| Argument              | Description                |
+|-----------------------|----------------------------|
+| -p AMOUNT             | Initial particle count     |
+| -e LIFETIME           | How long a particle lives  |
+| -g GEN                | Choose generator (l/c/s)   |
+| -b DURATION           | Benchmark duration seconds |
+| --kernelsource FILE   | Source of OpenCL kernels   |
+| --vertexshader FILE   | Vertex shader source       |
+| --geometryshader FILE | Geometry shader source     |
+| --fragmentshader FILE | Fragment shader source     |
+| --mousegravity        | Drag particles with mouse  |
 
 ## Preview
 ![Spiral](Screenshots/Spiral.png)<br><br>
 ![Distance Based Fragment shader](Screenshots/Distance-based.png)<br><br>
 ![Rainbow Sphere](Screenshots/Rainbow%20Sphere.png)<br><br>
+![Gravity](Screenshots/Gravity.png)<br><br>
 ![Alternate Gravity](Screenshots/Alternate%20Gravity.png)<br><br>
 
 ## Libraries

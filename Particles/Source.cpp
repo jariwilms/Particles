@@ -74,6 +74,7 @@ void generatorTestFunc()
 
 int main(int argc, char* argv[])
 {
+    // !!! OPENCL !!! //
     cl_int error;								                                        //OpenCL error code return
 
     cl_uint numPlatforms;                                                               //Number of platforms present on the host. Value from 1 to MAX_PLATFORM_ENTRIES
@@ -94,6 +95,7 @@ int main(int argc, char* argv[])
     bool calculateMovement = true;                                                      //Should movement be calculated every update?
     bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
     bool calculateEnergy = false;                                                       //Should energy be calculated every update?
+    bool mouseGravity = false;
 
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
     size_t initialParticles = 1000000;                                                   //Amount of particles to generate at the start of the simulation
@@ -107,9 +109,11 @@ int main(int argc, char* argv[])
     std::vector<Emitter*> emitters{};                                                   //Vector of particle emitters
     ParticleGenerator generator = _particle_generator_cube;                             //Generator function pointer for initial particles
     GeneratorSettings settings{};
+    // ### OPENCL ### //
 
 
 
+    // !!! OPENGL !!! //
     glm::vec2 windowDimensions{ 800.0f };                                               //Dimensions of viewport
     GLFWwindow* window = setup_gl(windowDimensions);                                    //OpenGL setup
     InputHandler inputHandler(window);                                                  //Class that handles input events
@@ -119,23 +123,21 @@ int main(int argc, char* argv[])
     glm::vec3 cameraPosition{ 0.0f };                                                   //Position of the camera after rotation
 
     ShaderInput shaderInput{};
-    Program particleShader("Shaders/particle.vs", nullptr, "Shaders/particle.fs");      //Particle shader
-    Program gravitorShader("Shaders/gravitor.vs", nullptr, "Shaders/gravitor.fs");      //Gravitor shader
-
     const unsigned int inputBufferId = 0;
     const unsigned int transformBufferId = 1;                                           
     float zoom{ 1.0f };                                                                 //Zoom level
 
-
-
     glm::vec3 hsv{ 0.0f, 1.0f, 1.0f };                                                  //Hue Saturation Value shift of particle colors
-    glm::vec4 backgroundColor{ 0.1f, 0.1f, 0.1f, 0.0f };                                //Color of the background
     bool hueShift = false;                                                              //Shift hue with time?
-    int particleSize = 1;                                                               //Size of particles
+
+    glm::vec4 backgroundColor{ 0.1f, 0.1f, 0.1f, 0.0f };                                //Color of the background
     float scrollMultiplier = 10.0f;
+    int particleSize = 1;                                                               //Size of particles
+    // ### OPENGL ### //
 
 
 
+    // !!! BENCHMARK !!! //
     std::chrono::high_resolution_clock::time_point startTime;                           //Start time of the simulation, initialized before update loop
     std::chrono::high_resolution_clock::time_point endTime;                             //Time to elapse before stopping the simulation
     std::chrono::high_resolution_clock::time_point t0;                                  //Time point before loop executes
@@ -145,9 +147,24 @@ int main(int argc, char* argv[])
     float deltaTime{};                                                                  //Elapsed time between each update
     float totalTime{};
     float benchmarkDuration{};
+    // ### BENCHMARK ### //
 
 
 
+    // !!! FILES !!! //
+    std::string particleVertexShaderName{ "Shaders/particle.vs" };                      //Vertex shader name
+    std::string particleGeometryShaderName{};                                           //Geometry shader name
+    std::string particleFragmentShaderName{ "Shaders/particle.fs" };                    //Fragment shader name
+
+    std::string particleKernelSourceName{ "Kernels/particles.cl" };                     //Kernel source name
+    std::string particleMoveKernelName{ "calculate_movement_single" };                  //movement kernel name
+    std::string particleGravityKernelName{ "calculate_gravity_single" };                //gravity kernel name
+    std::string particleEnergyKernelName{ "calculate_energy_single" };                  //energy kernel name
+    // ### FILES ### //
+
+
+
+    // !!! ARGUMENTS !!! //
     for (int i = 1; i < argc; ++i)
     {
         std::string arg = argv[i];
@@ -221,12 +238,51 @@ int main(int argc, char* argv[])
 
             ++i;
         }
+        else if (arg == "--kernelsource")
+        {
+            std::string val = argv[i + 1];
+
+            if (val.length() != 0) particleKernelSourceName = val;
+
+            ++i;
+        }
+        else if (arg == "--vertexshader")
+        {
+            std::string val = argv[i + 1];
+
+            if (val.length() != 0) particleVertexShaderName = val;
+
+            ++i;
+        }
+        else if (arg == "--geometryshader")
+        {
+            std::string val = argv[i + 1];
+
+            if (val.length() != 0) particleGeometryShaderName = val;
+
+            ++i;
+        }
+        else if (arg == "--fragmentshader")
+        {
+            std::string val = argv[i + 1];
+
+            if (val.length() != 0) particleFragmentShaderName = val;
+
+            ++i;
+        }
+        else if (arg == "--mousegravity")
+        {
+            mouseGravity = true;
+        }
         else
         {
             std::cout << "Invalid command line argument entered: " << arg << '\n';
             std::exit(EXIT_FAILURE);
         }
     }
+    // ### ARGUMENTS ### //
+
+
 
 
 
@@ -250,7 +306,8 @@ int main(int argc, char* argv[])
 
 
 
-
+    Program particleShader{ particleVertexShaderName.c_str(), particleGeometryShaderName.c_str(), particleFragmentShaderName.c_str() };
+    Program gravitorShader{ "Shaders/gravitor.vs", nullptr, "Shaders/gravitor.fs" };
 
     //Create shared particle buffer
     unsigned int PART_VAO, PART_VBO;
@@ -275,10 +332,11 @@ int main(int argc, char* argv[])
     //Create shared gravitor buffer
     hostGravitorBuffer.resize(GRAVITOR_BUFFER_SIZE);
     clGravitorBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, GRAVITOR_BUFFER_SIZE * sizeof(Gravitor), nullptr, &error);
-#if !MOUSE_GRAV
-    create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f), 0.1f);
-    error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
-#endif // !MOUSE_GRAV
+    if (!mouseGravity)
+    {
+        create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f), 0.1f);
+        error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
+    }
 
     unsigned int GRAV_VAO, GRAV_VBO;
     glGenVertexArrays(1, &GRAV_VAO);
@@ -316,7 +374,7 @@ int main(int argc, char* argv[])
 
 
     //Create program and compile GPU kernels
-    const char* kernelSource = Utils::read_file("Kernels/particles.cl");
+    const char* kernelSource = Utils::read_file(particleKernelSourceName.c_str());
 
     program = clCreateProgramWithSource(context, 1, &kernelSource, nullptr, &error);
     check_error(error, __LINE__);
@@ -324,15 +382,11 @@ int main(int argc, char* argv[])
     error = clBuildProgram(program, 1, &deviceId, nullptr, nullptr, nullptr);
     check_program_compile_error(error, program, deviceId, __LINE__);
 
-    kernelMV = clCreateKernel(program, "calculate_movement_single", &error);
+    kernelMV = clCreateKernel(program, particleMoveKernelName.c_str(), &error);
     check_kernel_compile_error(error, program, deviceId, __LINE__);
-#if ALT_GRAVITY
-    kernelGV = clCreateKernel(program, "calculate_gravity_single_alt", &error);
-#else
-    kernelGV = clCreateKernel(program, "calculate_gravity_single", &error);
-#endif // ALT_GRAVITY
+    kernelGV = clCreateKernel(program, particleGravityKernelName.c_str(), &error);
     check_kernel_compile_error(error, program, deviceId, __LINE__);
-    kernelEN = clCreateKernel(program, "calculate_energy_single", &error);
+    kernelEN = clCreateKernel(program, particleEnergyKernelName.c_str(), &error);
     check_kernel_compile_error(error, program, deviceId, __LINE__);
 
     error = clSetKernelArg(kernelMV, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
@@ -358,7 +412,7 @@ int main(int argc, char* argv[])
 
 
     glm::vec4 projectionDimensions{ -1.0f, 1.0f, -1.0f, 1.0f };
-    transform.projection = glm::ortho(projectionDimensions.x, projectionDimensions.y, projectionDimensions.z, projectionDimensions.w, 0.01f, 10.0f);
+    transform.projection = glm::ortho(projectionDimensions.x, projectionDimensions.y, projectionDimensions.z, projectionDimensions.w, 0.01f, 100.0f);
 
     shaderInput.resolution = windowDimensions;
 
@@ -414,49 +468,7 @@ int main(int argc, char* argv[])
         {
             hsv.x += deltaTime * 0.01f;
         }
-#if MOUSE_GRAV
-        if (inputHandler.is_button_pressed(SPAWN_GRAVITOR_INPUT) || inputHandler.is_button_pressed(SPAWN_REPULSOR_INPUT))
-        {
-            glm::vec2 screenPosition = glm::vec2(inputHandler.cursor_position() / windowDimensions);
-            glm::vec2 absolutePosition = glm::vec2(screenPosition.x, -screenPosition.y) * 2.0f + glm::vec2(projectionDimensions.x, projectionDimensions.w);
-            glm::vec4 rotatedPosition = rotationMatrix * glm::vec4(absolutePosition / zoom, 0.0f, 0.0f);
 
-            float gravity = 0.0f;
-            if (inputHandler.is_button_pressed(SPAWN_GRAVITOR_INPUT)) gravity = 1.0f;
-            if (inputHandler.is_button_pressed(SPAWN_REPULSOR_INPUT)) gravity = -1.0f;
-
-            hostGravitorBuffer[0] = Gravitor(rotatedPosition, glm::vec3(0.0f), glm::vec4(1.0f), gravity);
-            gravitorCount = 1;
-
-            error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
-
-            glBindVertexArray(GRAV_VAO);
-            glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data());
-        }
-        else
-        {
-            gravitorCount = 0;
-        }
-#else
-        if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT) || inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT))
-        {
-            glm::vec2 screenPosition = glm::vec2(inputHandler.cursor_position() / windowDimensions);
-            glm::vec2 absolutePosition = glm::vec2(screenPosition.x, -screenPosition.y) * 2.0f + glm::vec2(projectionDimensions.x, projectionDimensions.w);
-            glm::vec4 rotatedPosition = rotationMatrix * glm::vec4(absolutePosition / zoom, 0.0f, 0.0f);
-
-            float gravity = 0.0f;
-            if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT)) gravity = 1.0f;
-            if (inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT)) gravity = -1.0f;
-
-            create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(rotatedPosition), gravity);
-            error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
-
-            glBindVertexArray(GRAV_VAO);
-            glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data());
-        }
-#endif // MOUSE_GRAV
         if (inputHandler.is_key_pressed_once(TOGGLE_MOVEMENT_INPUT)) calculateMovement = !calculateMovement;
         if (inputHandler.is_key_pressed_once(TOGGLE_GRAVITY_INPUT)) calculateGravity = !calculateGravity;
         if (inputHandler.is_key_pressed_once(INCREASE_POINT_SIZE_INPUT))
@@ -515,6 +527,53 @@ int main(int argc, char* argv[])
             }
 
             particleShader.set_vec3("uHSV", hsv);
+        }
+
+        if (mouseGravity)
+        {
+            if (inputHandler.is_button_pressed(SPAWN_GRAVITOR_INPUT) || inputHandler.is_button_pressed(SPAWN_REPULSOR_INPUT))
+            {
+                glm::vec2 screenPosition = glm::vec2(inputHandler.cursor_position() / windowDimensions);
+                glm::vec2 absolutePosition = glm::vec2(screenPosition.x, -screenPosition.y) * 2.0f + glm::vec2(projectionDimensions.x, projectionDimensions.w);
+                glm::vec4 rotatedPosition = rotationMatrix * glm::vec4(absolutePosition / zoom, 0.0f, 0.0f);
+
+                float gravity = 0.0f;
+                if (inputHandler.is_button_pressed(SPAWN_GRAVITOR_INPUT)) gravity = 1.0f;
+                if (inputHandler.is_button_pressed(SPAWN_REPULSOR_INPUT)) gravity = -1.0f;
+
+                hostGravitorBuffer[0] = Gravitor(rotatedPosition, glm::vec3(0.0f), glm::vec4(1.0f), gravity);
+                gravitorCount = 1;
+
+                error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
+
+                glBindVertexArray(GRAV_VAO);
+                glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data());
+            }
+            else
+            {
+                gravitorCount = 0;
+            }
+        }
+        else
+        {
+            if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT) || inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT))
+            {
+                glm::vec2 screenPosition = glm::vec2(inputHandler.cursor_position() / windowDimensions);
+                glm::vec2 absolutePosition = glm::vec2(screenPosition.x, -screenPosition.y) * 2.0f + glm::vec2(projectionDimensions.x, projectionDimensions.w);
+                glm::vec4 rotatedPosition = rotationMatrix * glm::vec4(absolutePosition / zoom, 0.0f, 0.0f);
+
+                float gravity = 0.0f;
+                if (inputHandler.is_button_pressed_once(SPAWN_GRAVITOR_INPUT)) gravity = 1.0f;
+                if (inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT)) gravity = -1.0f;
+
+                create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(rotatedPosition), gravity);
+                error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
+
+                glBindVertexArray(GRAV_VAO);
+                glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data());
+            }
         }
 
         if (calculateEnergy)

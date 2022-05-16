@@ -187,6 +187,9 @@ xcopy /y $(ProjectDir)Shaders $(OutDir)Shaders /e /h /c /i </Command>
   </ItemGroup>
   <ItemGroup>
     <None Include="Kernels\particles.cl" />
+    <None Include="particle_distance.fs" />
+    <None Include="particle_hsv.fs" />
+    <None Include="particle_uv.fs" />
     <None Include="Shaders\gravitor.fs" />
     <None Include="Shaders\gravitor.vs" />
     <None Include="Shaders\particle.fs" />

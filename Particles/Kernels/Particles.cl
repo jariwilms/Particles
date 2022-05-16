@@ -47,7 +47,7 @@ typedef struct Gravitor
 } Gravitor;
 
 //Functions with _single postfix run only a single calculation per kernel while _looped functions iterate over a set amount of particles.
-//Running more work dimensions over a single function grants a large speedup over the looped version
+//Running work items in multiple dimensions over a single function grants a large performance gain over the looped version
 
 __kernel void calculate_movement_single(__global Particle* particles, int particleCount, float deltaTime)
 {

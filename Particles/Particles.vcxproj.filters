@@ -19,6 +19,9 @@
     <Filter Include="Resource Files\Kernels">
       <UniqueIdentifier>{2436c86c-f609-49df-adfe-4d01a96ae639}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files\Shaders\Alternative">
+      <UniqueIdentifier>{a8dc32e5-f2d2-4e62-aa21-42df1e7948e1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source.cpp">
@@ -117,6 +120,15 @@
     </None>
     <None Include="Shaders\gravitor.vs">
       <Filter>Resource Files\Shaders</Filter>
+    </None>
+    <None Include="particle_distance.fs">
+      <Filter>Resource Files\Shaders\Alternative</Filter>
+    </None>
+    <None Include="particle_uv.fs">
+      <Filter>Resource Files\Shaders\Alternative</Filter>
+    </None>
+    <None Include="particle_hsv.fs">
+      <Filter>Resource Files\Shaders\Alternative</Filter>
     </None>
   </ItemGroup>
 </Project>
