@@ -106,20 +106,6 @@ void check_program_compile_error(cl_int error, cl_program program, cl_device_id 
     std::cout << log;
     exit(EXIT_FAILURE);
 }
-void check_kernel_compile_error(cl_int error, cl_program program, cl_device_id device_id, int line) //zelfde code als hierboven GG uninstall
-{
-    if (error == CL_SUCCESS)
-        return;
-
-    size_t len = 0;
-    clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, NULL, NULL, &len);
-
-    char* log = new char[len];
-    clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, len, log, NULL);
-
-    std::cout << log;
-    exit(EXIT_FAILURE);
-}
 
 cl_platform_id _select_platform()
 {

@@ -121,7 +121,7 @@ int main(int argc, char* argv[])
     Transform transform{};
     glm::vec2 rotation{ 0.0f };                                                         //Current rotation of the camera around the origin
     glm::vec3 cameraPosition{ 0.0f };                                                   //Position of the camera after rotation
-
+    
     ShaderInput shaderInput{};
     const unsigned int inputBufferId = 0;
     const unsigned int transformBufferId = 1;                                           
@@ -131,7 +131,7 @@ int main(int argc, char* argv[])
     bool hueShift = false;                                                              //Shift hue with time?
 
     glm::vec4 backgroundColor{ 0.1f, 0.1f, 0.1f, 0.0f };                                //Color of the background
-    float scrollMultiplier = 10.0f;
+    float scrollMultiplier = 10.0f;                                                     //Multiplier for certain scroll actions
     int particleSize = 1;                                                               //Size of particles
     // ### OPENGL ### //
 
@@ -286,9 +286,12 @@ int main(int argc, char* argv[])
 
 
 
-    //OpenCL setup
+    // !!! OPENCL SETUP !!! //
     error = clGetPlatformIDs(1, &platformId, &numPlatforms);
+    check_error(error, __LINE__);
+
     error = clGetDeviceIDs(platformId, CL_DEVICE_TYPE_GPU, 1, &deviceId, &numDevices);
+    check_error(error, __LINE__);
 
     cl_context_properties properties[] = 
     {
@@ -299,9 +302,14 @@ int main(int argc, char* argv[])
     };
 
     context = clCreateContext(properties, numDevices, &deviceId, nullptr, nullptr, &error);
-    commandQueue = clCreateCommandQueue(context, deviceId, NULL, &error);
+    check_error(error, __LINE__);
 
-    clGetDeviceInfo(deviceId, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(globalWorkSize), &globalWorkSize, nullptr);
+    commandQueue = clCreateCommandQueue(context, deviceId, NULL, &error);
+    check_error(error, __LINE__);
+
+    error = clGetDeviceInfo(deviceId, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(globalWorkSize), &globalWorkSize, nullptr);
+    check_error(error, __LINE__);
+
     globalWorkSize[1] = (initialParticles / globalWorkSize[0]) + 1;
 
 
@@ -332,10 +340,13 @@ int main(int argc, char* argv[])
     //Create shared gravitor buffer
     hostGravitorBuffer.resize(GRAVITOR_BUFFER_SIZE);
     clGravitorBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, GRAVITOR_BUFFER_SIZE * sizeof(Gravitor), nullptr, &error);
+    check_error(error, __LINE__);
     if (!mouseGravity)
     {
         create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(0.0f), 0.1f);
+
         error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
+        check_error(error, __LINE__);
     }
 
     unsigned int GRAV_VAO, GRAV_VBO;
@@ -383,31 +394,37 @@ int main(int argc, char* argv[])
     check_program_compile_error(error, program, deviceId, __LINE__);
 
     kernelMV = clCreateKernel(program, particleMoveKernelName.c_str(), &error);
-    check_kernel_compile_error(error, program, deviceId, __LINE__);
+    check_program_compile_error(error, program, deviceId, __LINE__);
     kernelGV = clCreateKernel(program, particleGravityKernelName.c_str(), &error);
-    check_kernel_compile_error(error, program, deviceId, __LINE__);
+    check_program_compile_error(error, program, deviceId, __LINE__);
     kernelEN = clCreateKernel(program, particleEnergyKernelName.c_str(), &error);
-    check_kernel_compile_error(error, program, deviceId, __LINE__);
+    check_program_compile_error(error, program, deviceId, __LINE__);
 
     error = clSetKernelArg(kernelMV, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
+    check_error(error, __LINE__);
     error = clSetKernelArg(kernelGV, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
+    check_error(error, __LINE__);
     error = clSetKernelArg(kernelGV, 2, sizeof(cl_mem), (void*)&clGravitorBuffer);
+    check_error(error, __LINE__);
     error = clSetKernelArg(kernelEN, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
+    check_error(error, __LINE__);
 
 
 
 
-
-    settings.color_min = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
-    settings.color_max = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
     //Map GPU memory to a host pointer and generate an initial amount of particles
     std::srand((unsigned int)time((time_t*)nullptr));
+
     error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
+    check_error(error, __LINE__);
     Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_WRITE_ONLY, 0, initialParticles * sizeof(Particle), 0, nullptr, nullptr, &error);
+    check_error(error, __LINE__);
     Emitter::GenerateOnce(particles, particleCount, initialParticles, generator, settings);
-    clEnqueueUnmapMemObject(commandQueue, clParticleBuffer, particles, 0, nullptr, nullptr);
+    error = clEnqueueUnmapMemObject(commandQueue, clParticleBuffer, particles, 0, nullptr, nullptr);
+    check_error(error, __LINE__);
     error = clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
+    check_error(error, __LINE__);
 
 
 
@@ -433,7 +450,7 @@ int main(int argc, char* argv[])
 
 
 
-        error = clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
+        clEnqueueAcquireGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
         if (inputHandler.is_key_pressed_once(CLOSE_WINDOW_KEY)) glfwSetWindowShouldClose(window, true);
 
@@ -464,10 +481,7 @@ int main(int argc, char* argv[])
         transform.view = glm::lookAt(cameraPosition, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         transform.view = glm::scale(transform.view, glm::vec3(zoom));
 
-        if (hueShift)
-        {
-            hsv.x += deltaTime * 0.01f;
-        }
+        if (hueShift) hsv.x += deltaTime * 0.01f;
 
         if (inputHandler.is_key_pressed_once(TOGGLE_MOVEMENT_INPUT)) calculateMovement = !calculateMovement;
         if (inputHandler.is_key_pressed_once(TOGGLE_GRAVITY_INPUT)) calculateGravity = !calculateGravity;
@@ -494,13 +508,11 @@ int main(int argc, char* argv[])
             {
                 hsv.y += scrollValueY * deltaTime;
                 hsv.y = std::clamp(hsv.y, -1.0f, 1.0f);
-                std::cout << "S: " << hsv.y << '\n';
             }
             else if (inputHandler.is_key_pressed(CHANGE_VALUE_INPUT))
             {
                 hsv.z += scrollValueY * deltaTime;
                 hsv.z = std::clamp(hsv.z, -1.0f, 1.0f);
-                std::cout << "V: " << hsv.z << '\n';
             }
             else if (inputHandler.is_key_pressed(CHANGE_BACKGROUND_R_INPUT))
             {
@@ -544,7 +556,7 @@ int main(int argc, char* argv[])
                 hostGravitorBuffer[0] = Gravitor(rotatedPosition, glm::vec3(0.0f), glm::vec4(1.0f), gravity);
                 gravitorCount = 1;
 
-                error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
+                clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
 
                 glBindVertexArray(GRAV_VAO);
                 glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
@@ -568,7 +580,7 @@ int main(int argc, char* argv[])
                 if (inputHandler.is_button_pressed_once(SPAWN_REPULSOR_INPUT)) gravity = -1.0f;
 
                 create_gravitor(hostGravitorBuffer, gravitorCount, glm::vec3(rotatedPosition), gravity);
-                error = clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
+                clEnqueueWriteBuffer(commandQueue, clGravitorBuffer, CL_TRUE, 0, gravitorCount * sizeof(Gravitor), hostGravitorBuffer.data(), 0, nullptr, nullptr);
 
                 glBindVertexArray(GRAV_VAO);
                 glBindBuffer(GL_ARRAY_BUFFER, GRAV_VBO);
@@ -580,33 +592,33 @@ int main(int argc, char* argv[])
         {
             size_t count = 0;
 
-            Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_READ_WRITE, 0, (particleCount + count) * sizeof(Particle), 0, nullptr, nullptr, &error);
+            Particle* particles = (Particle*)clEnqueueMapBuffer(commandQueue, clParticleBuffer, CL_TRUE, CL_MEM_READ_WRITE, 0, (particleCount + count) * sizeof(Particle), 0, nullptr, nullptr, nullptr);
             remove_dead_particles(particles, particleCount);
-            error = clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, (particleCount) * sizeof(Particle), particles, 0, nullptr, nullptr);
-            error = clEnqueueUnmapMemObject(commandQueue, clParticleBuffer, particles, 0, nullptr, nullptr);
+            clEnqueueWriteBuffer(commandQueue, clParticleBuffer, CL_TRUE, 0, (particleCount) * sizeof(Particle), particles, 0, nullptr, nullptr);
+            clEnqueueUnmapMemObject(commandQueue, clParticleBuffer, particles, 0, nullptr, nullptr);
 
             globalWorkSize[1] = (particleCount / globalWorkSize[0]) + 1;
 
-            error = clSetKernelArg(kernelEN, 1, sizeof(int), &particleCount);
-            error = clSetKernelArg(kernelEN, 2, sizeof(float), &deltaTime);
-            error = clEnqueueNDRangeKernel(commandQueue, kernelEN, 2, nullptr, globalWorkSize, nullptr, 0, nullptr, nullptr);
+            clSetKernelArg(kernelEN, 1, sizeof(int), &particleCount);
+            clSetKernelArg(kernelEN, 2, sizeof(float), &deltaTime);
+            clEnqueueNDRangeKernel(commandQueue, kernelEN, 2, nullptr, globalWorkSize, nullptr, 0, nullptr, nullptr);
         }
         if (calculateGravity && calculateMovement)
         {
-            error = clSetKernelArg(kernelGV, 1, sizeof(int), &particleCount);
-            error = clSetKernelArg(kernelGV, 3, sizeof(int), &gravitorCount);
-            error = clSetKernelArg(kernelGV, 4, sizeof(float), &deltaTime);
-            error = clEnqueueNDRangeKernel(commandQueue, kernelGV, 2, nullptr, globalWorkSize, nullptr, 0, nullptr, nullptr);
+            clSetKernelArg(kernelGV, 1, sizeof(int), &particleCount);
+            clSetKernelArg(kernelGV, 3, sizeof(int), &gravitorCount);
+            clSetKernelArg(kernelGV, 4, sizeof(float), &deltaTime);
+            clEnqueueNDRangeKernel(commandQueue, kernelGV, 2, nullptr, globalWorkSize, nullptr, 0, nullptr, nullptr);
         }
         if (calculateMovement)
         {
-            error = clSetKernelArg(kernelMV, 1, sizeof(int), &particleCount);
-            error = clSetKernelArg(kernelMV, 2, sizeof(float), &deltaTime);
-            error = clEnqueueNDRangeKernel(commandQueue, kernelMV, 2, nullptr, globalWorkSize, nullptr, 0, nullptr, nullptr);
+            clSetKernelArg(kernelMV, 1, sizeof(int), &particleCount);
+            clSetKernelArg(kernelMV, 2, sizeof(float), &deltaTime);
+            clEnqueueNDRangeKernel(commandQueue, kernelMV, 2, nullptr, globalWorkSize, nullptr, 0, nullptr, nullptr);
         }
 
-        error = clFinish(commandQueue);
-        error = clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
+        clFinish(commandQueue);
+        clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
 
 
 
