@@ -72,9 +72,15 @@ void generatorTestFunc()
     exit(1);
 }
 
+enum t
+{
+    a = 0, 
+    b = 1
+};
+
 int main(int argc, char* argv[])
 {
-    // !!! OPENCL !!! //
+    // !!! OPENCL VARIABLES !!! //
     cl_int error;								                                        //OpenCL error code return
 
     cl_uint numPlatforms;                                                               //Number of platforms present on the host. Value from 1 to MAX_PLATFORM_ENTRIES
@@ -95,10 +101,10 @@ int main(int argc, char* argv[])
     bool calculateMovement = true;                                                      //Should movement be calculated every update?
     bool calculateGravity = true;                                                       //Should gravity be calculated every update? Is only true is calculateMovement is true
     bool calculateEnergy = false;                                                       //Should energy be calculated every update?
-    bool mouseGravity = false;
+    bool mouseGravity = false;                                                          //Should the mouse control gravity?
 
     cl_mem clParticleBuffer;                                                            //Pointer to GPU allocated particle buffer
-    size_t initialParticles = 1000000;                                                   //Amount of particles to generate at the start of the simulation
+    size_t initialParticles = 1000000;                                                  //Amount of particles to generate at the start of the simulation
     size_t particleCount{};                                                             //Amount of particles => separate variable to prevent host/GPU buffer resizing
 
     std::vector<Gravitor> hostGravitorBuffer;                                           //Gravitor buffer of static size that remains on the host
@@ -108,23 +114,26 @@ int main(int argc, char* argv[])
 
     std::vector<Emitter*> emitters{};                                                   //Vector of particle emitters
     ParticleGenerator generator = _particle_generator_cube;                             //Generator function pointer for initial particles
-    GeneratorSettings settings{};
-    // ### OPENCL ### //
+    GeneratorSettings settings{};                                                       //Settings for initial particle generation
+    // ### OPENCL VARIABLES ### //
 
 
 
-    // !!! OPENGL !!! //
+
+
+    // !!! OPENGL VARIABLES !!! //
     glm::vec2 windowDimensions{ 800.0f };                                               //Dimensions of viewport
     GLFWwindow* window = setup_gl(windowDimensions);                                    //OpenGL setup
     InputHandler inputHandler(window);                                                  //Class that handles input events
 
-    Transform transform{};
+	glm::vec4 projectionDimensions{ -1.0f, 1.0f, -1.0f, 1.0f };                         //Orthographic projection settings
     glm::vec2 rotation{ 0.0f };                                                         //Current rotation of the camera around the origin
     glm::vec3 cameraPosition{ 0.0f };                                                   //Position of the camera after rotation
     
-    ShaderInput shaderInput{};
-    const unsigned int inputBufferId = 0;
-    const unsigned int transformBufferId = 1;                                           
+    Transform transform{};                                                              //Shared uniform transform struct
+    ShaderInput shaderInput{};                                                          //Shared uniform shader variable struct
+    const unsigned int transformBufferId = 1;                                           //Binding ID of transform input buffer
+    const unsigned int inputBufferId = 0;                                               //Binding ID of shader input buffer
     float zoom{ 1.0f };                                                                 //Zoom level
 
     glm::vec3 hsv{ 0.0f, 1.0f, 1.0f };                                                  //Hue Saturation Value shift of particle colors
@@ -133,7 +142,9 @@ int main(int argc, char* argv[])
     glm::vec4 backgroundColor{ 0.1f, 0.1f, 0.1f, 0.0f };                                //Color of the background
     float scrollMultiplier = 10.0f;                                                     //Multiplier for certain scroll actions
     int particleSize = 1;                                                               //Size of particles
-    // ### OPENGL ### //
+    // ### OPENGL VARIABLES ### //
+
+
 
 
 
@@ -145,16 +156,22 @@ int main(int argc, char* argv[])
     std::vector<float> frameTimes{};                                                    //Vector of time taken per frame
     unsigned int updateCount{};                                                         //Total amount of updates the simulation has done
     float deltaTime{};                                                                  //Elapsed time between each update
-    float totalTime{};
-    float benchmarkDuration{};
+    float totalTime{};                                                                  //Total elapsed time
+    float benchmarkDuration{};                                                          //How long the benchmark should last
     // ### BENCHMARK ### //
 
 
 
+
+
     // !!! FILES !!! //
-    std::string particleVertexShaderName{ "Shaders/particle.vs" };                      //Vertex shader name
-    std::string particleGeometryShaderName{};                                           //Geometry shader name
-    std::string particleFragmentShaderName{ "Shaders/particle.fs" };                    //Fragment shader name
+    std::string particleVertexShaderName{ "Shaders/particle.vert" };                    //Particle vertex shader name
+    std::string particleGeometryShaderName{};                                           //Particle geometry shader name
+    std::string particleFragmentShaderName{ "Shaders/particle.frag" };                  //Particle fragment shader name
+
+    std::string gravitorVertexShaderName{ "Shaders/gravitor.vert" };                    //Gravitor vertex shader name
+    std::string gravitorGeometryShaderName{};                                           //Gravitor geometry shader name
+    std::string gravitorFragmentShaderName{ "Shaders/gravitor.frag" };                  //Gravitor fragment shader name
 
     std::string particleKernelSourceName{ "Kernels/particles.cl" };                     //Kernel source name
     std::string particleMoveKernelName{ "calculate_movement_single" };                  //movement kernel name
@@ -164,8 +181,10 @@ int main(int argc, char* argv[])
 
 
 
+
+
     // !!! ARGUMENTS !!! //
-    for (int i = 1; i < argc; ++i)
+    for (int i = 1; i < argc; ++i)                                                      //Parse command line arguments
     {
         std::string arg = argv[i];
 
@@ -280,6 +299,8 @@ int main(int argc, char* argv[])
             std::exit(EXIT_FAILURE);
         }
     }
+
+    PARTICLE_BUFFER_SIZE = initialParticles;                                            //Allocate a buffer the size of the initial particle count
     // ### ARGUMENTS ### //
 
 
@@ -289,7 +310,6 @@ int main(int argc, char* argv[])
     // !!! OPENCL SETUP !!! //
     error = clGetPlatformIDs(1, &platformId, &numPlatforms);
     check_error(error, __LINE__);
-
     error = clGetDeviceIDs(platformId, CL_DEVICE_TYPE_GPU, 1, &deviceId, &numDevices);
     check_error(error, __LINE__);
 
@@ -303,10 +323,8 @@ int main(int argc, char* argv[])
 
     context = clCreateContext(properties, numDevices, &deviceId, nullptr, nullptr, &error);
     check_error(error, __LINE__);
-
     commandQueue = clCreateCommandQueue(context, deviceId, NULL, &error);
     check_error(error, __LINE__);
-
     error = clGetDeviceInfo(deviceId, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(globalWorkSize), &globalWorkSize, nullptr);
     check_error(error, __LINE__);
 
@@ -314,18 +332,56 @@ int main(int argc, char* argv[])
 
 
 
+    //Create program and compile kernels
+	const char* kernelSource = Utils::read_file(particleKernelSourceName.c_str());
+
+	program = clCreateProgramWithSource(context, 1, &kernelSource, nullptr, &error);
+	check_error(error, __LINE__);
+	error = clBuildProgram(program, 1, &deviceId, nullptr, nullptr, nullptr);
+	check_program_compile_error(error, program, deviceId, __LINE__);
+
+	kernelMV = clCreateKernel(program, particleMoveKernelName.c_str(), &error);
+	check_program_compile_error(error, program, deviceId, __LINE__);
+	kernelGV = clCreateKernel(program, particleGravityKernelName.c_str(), &error);
+	check_program_compile_error(error, program, deviceId, __LINE__);
+	kernelEN = clCreateKernel(program, particleEnergyKernelName.c_str(), &error);
+	check_program_compile_error(error, program, deviceId, __LINE__);
+	// ### OPENCL SETUP ### //
+
+
+
+
+
+    // !!! OPENGL SETUP !!! //
     Program particleShader{ particleVertexShaderName.c_str(), particleGeometryShaderName.c_str(), particleFragmentShaderName.c_str() };
-    Program gravitorShader{ "Shaders/gravitor.vs", nullptr, "Shaders/gravitor.fs" };
+    Program gravitorShader{ gravitorVertexShaderName.c_str(), gravitorGeometryShaderName.c_str(), gravitorFragmentShaderName.c_str() };
+
+
+
+    //Create Shader input buffer
+	unsigned int INPUT_UBO;
+	glGenBuffers(1, &INPUT_UBO);
+	glBindBuffer(GL_UNIFORM_BUFFER, INPUT_UBO);
+	glBindBufferBase(GL_UNIFORM_BUFFER, inputBufferId, INPUT_UBO);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof(ShaderInput), nullptr, GL_DYNAMIC_DRAW);
+
+    //Create shared uniform buffer
+	unsigned int TRANS_UBO;
+	glGenBuffers(1, &TRANS_UBO);
+	glBindBuffer(GL_UNIFORM_BUFFER, TRANS_UBO);
+	glBindBufferBase(GL_UNIFORM_BUFFER, transformBufferId, TRANS_UBO);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof(Transform), nullptr, GL_DYNAMIC_DRAW);
+
+
 
     //Create shared particle buffer
-    unsigned int PART_VAO, PART_VBO;
+	unsigned int PART_VAO, PART_VBO;
     glGenVertexArrays(1, &PART_VAO);
     glBindVertexArray(PART_VAO);
 
     glGenBuffers(1, &PART_VBO);
     glBindBuffer(GL_ARRAY_BUFFER, PART_VBO);
-    if (calculateEnergy) glBufferData(GL_ARRAY_BUFFER, PARTICLE_BUFFER_SIZE * sizeof(Particle), nullptr, GL_DYNAMIC_DRAW);
-    else glBufferData(GL_ARRAY_BUFFER, PARTICLE_BUFFER_SIZE * sizeof(Particle), nullptr, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, PARTICLE_BUFFER_SIZE * sizeof(Particle), nullptr, GL_STREAM_DRAW);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Particle), nullptr);
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Particle), (void*)(2 * sizeof(glm::vec3)));
@@ -334,8 +390,6 @@ int main(int argc, char* argv[])
 
     clParticleBuffer = clCreateFromGLBuffer(context, CL_MEM_READ_WRITE, PART_VBO, &error);
     check_error(error, __LINE__);
-
-
 
     //Create shared gravitor buffer
     hostGravitorBuffer.resize(GRAVITOR_BUFFER_SIZE);
@@ -361,45 +415,13 @@ int main(int argc, char* argv[])
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Gravitor), (void*)(2 * sizeof(glm::vec3)));
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
-
-
-
-    //Create Shader input buffer
-    unsigned int INPUT_UBO;
-    glGenBuffers(1, &INPUT_UBO);
-    glBindBuffer(GL_UNIFORM_BUFFER, INPUT_UBO);
-    glBindBufferBase(GL_UNIFORM_BUFFER, inputBufferId, INPUT_UBO);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(ShaderInput), nullptr, GL_DYNAMIC_DRAW);
-
-
-
-    //Create shared uniform buffer
-    unsigned int TRANS_UBO;
-    glGenBuffers(1, &TRANS_UBO);
-    glBindBuffer(GL_UNIFORM_BUFFER, TRANS_UBO);
-    glBindBufferBase(GL_UNIFORM_BUFFER, transformBufferId, TRANS_UBO);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(Transform), nullptr, GL_DYNAMIC_DRAW);
+    // ### OPENGL SETUP ### //
 
 
 
 
 
-    //Create program and compile GPU kernels
-    const char* kernelSource = Utils::read_file(particleKernelSourceName.c_str());
-
-    program = clCreateProgramWithSource(context, 1, &kernelSource, nullptr, &error);
-    check_error(error, __LINE__);
-
-    error = clBuildProgram(program, 1, &deviceId, nullptr, nullptr, nullptr);
-    check_program_compile_error(error, program, deviceId, __LINE__);
-
-    kernelMV = clCreateKernel(program, particleMoveKernelName.c_str(), &error);
-    check_program_compile_error(error, program, deviceId, __LINE__);
-    kernelGV = clCreateKernel(program, particleGravityKernelName.c_str(), &error);
-    check_program_compile_error(error, program, deviceId, __LINE__);
-    kernelEN = clCreateKernel(program, particleEnergyKernelName.c_str(), &error);
-    check_program_compile_error(error, program, deviceId, __LINE__);
-
+    // !!! KERNEL CONFIG !!! //
     error = clSetKernelArg(kernelMV, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
     check_error(error, __LINE__);
     error = clSetKernelArg(kernelGV, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
@@ -408,8 +430,6 @@ int main(int argc, char* argv[])
     check_error(error, __LINE__);
     error = clSetKernelArg(kernelEN, 0, sizeof(cl_mem), (void*)&clParticleBuffer);
     check_error(error, __LINE__);
-
-
 
 
 
@@ -425,12 +445,13 @@ int main(int argc, char* argv[])
     check_error(error, __LINE__);
     error = clEnqueueReleaseGLObjects(commandQueue, 1, &clParticleBuffer, 0, nullptr, nullptr);
     check_error(error, __LINE__);
+	// ### KERNEL CONFIG ### //
 
 
 
-    glm::vec4 projectionDimensions{ -1.0f, 1.0f, -1.0f, 1.0f };
+
+
     transform.projection = glm::ortho(projectionDimensions.x, projectionDimensions.y, projectionDimensions.z, projectionDimensions.w, 0.01f, 100.0f);
-
     shaderInput.resolution = windowDimensions;
 
     startTime = std::chrono::high_resolution_clock::now();
@@ -622,8 +643,6 @@ int main(int argc, char* argv[])
 
 
 
-
-
         //Global uniform buffer data
         glBindBuffer(GL_UNIFORM_BUFFER, INPUT_UBO);
         glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(ShaderInput), &shaderInput);
@@ -631,23 +650,17 @@ int main(int argc, char* argv[])
         glBindBuffer(GL_UNIFORM_BUFFER, TRANS_UBO);
         glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Transform), &transform);
 
-
+		//Draw particles
+		particleShader.use();
+		glPointSize((GLfloat)particleSize);
+		glBindVertexArray(PART_VAO);
+		glDrawArrays(GL_POINTS, 0, (GLsizei)particleCount);
 
         //Draw gravitors
         gravitorShader.use();
         glPointSize(6);
         glBindVertexArray(GRAV_VAO);
         glDrawArrays(GL_POINTS, 0, (GLsizei)gravitorCount);
-
-
-
-        //Draw particles
-        particleShader.use();
-        glPointSize((GLfloat)particleSize);
-        glBindVertexArray(PART_VAO);
-        glDrawArrays(GL_POINTS, 0, (GLsizei)particleCount);
-
-
 
 
 

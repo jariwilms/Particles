@@ -189,13 +189,13 @@ xcopy /y $(ProjectDir)Shaders $(OutDir)Shaders /e /h /c /i </Command>
   </ItemGroup>
   <ItemGroup>
     <None Include="Kernels\particles.cl" />
-    <None Include="particle_distance.fs" />
-    <None Include="particle_hsv.fs" />
-    <None Include="particle_uv.fs" />
-    <None Include="Shaders\gravitor.fs" />
-    <None Include="Shaders\gravitor.vs" />
-    <None Include="Shaders\particle.fs" />
-    <None Include="Shaders\particle.vs" />
+    <None Include="particle_distance.frag" />
+    <None Include="particle_hsv.frag" />
+    <None Include="particle_uv.frag" />
+    <None Include="Shaders\gravitor.frag" />
+    <None Include="Shaders\gravitor.vert" />
+    <None Include="Shaders\particle.frag" />
+    <None Include="Shaders\particle.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

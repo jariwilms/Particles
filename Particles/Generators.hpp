@@ -13,13 +13,14 @@
 #include "Particle.hpp"
 #include "GeneratorSettings.hpp"
 
-extern const size_t PARTICLE_BUFFER_SIZE;
-extern const size_t GRAVITOR_BUFFER_SIZE;
+extern size_t PARTICLE_BUFFER_SIZE;
+extern size_t GRAVITOR_BUFFER_SIZE;
 
 #define RAND_F(min, max) (min + std::rand() / (RAND_MAX / (max - min)))
 
 #define _P_GEN_SIG Particle* particles, size_t offset, size_t amount, GeneratorSettings settings
 #define GEN_SIG Particle* particles, size_t& particleCount, size_t amount, ParticleGenerator generator, GeneratorSettings settings
+#define CHECK_BOUNDS amount = particleCount + amount > PARTICLE_BUFFER_SIZE ? PARTICLE_BUFFER_SIZE - particleCount : amount
 
 // https://www.youtube.com/watch?v=UvZjzKOpdVM
 using ParticleGenerator = void(*)(_P_GEN_SIG);

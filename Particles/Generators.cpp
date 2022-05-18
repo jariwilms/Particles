@@ -125,14 +125,14 @@ void _particle_generator_cone(Particle* particles, size_t offset, size_t amount,
 
 void generate_particles_st(Particle* particles, size_t& particleCount, size_t amount, ParticleGenerator generator, GeneratorSettings settings)
 {
-    amount = particleCount + amount > PARTICLE_BUFFER_SIZE ? PARTICLE_BUFFER_SIZE - particleCount : amount;
+    CHECK_BOUNDS;
 
     generator(particles, particleCount, amount, settings);
     particleCount += amount;
 }
 void generate_particles_mt(Particle* particles, size_t& particleCount, size_t amount, ParticleGenerator generator, GeneratorSettings settings)
 {
-    amount = particleCount + amount > PARTICLE_BUFFER_SIZE ? PARTICLE_BUFFER_SIZE - particleCount : amount;
+    CHECK_BOUNDS;
 
     constexpr auto THREAD_COUNT = 8;
     size_t particlesPerThread = amount / THREAD_COUNT;

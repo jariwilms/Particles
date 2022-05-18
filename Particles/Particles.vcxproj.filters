@@ -106,28 +106,28 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shaders\particle.fs">
+    <None Include="Shaders\particle.frag">
       <Filter>Resource Files\Shaders</Filter>
     </None>
-    <None Include="Shaders\particle.vs">
+    <None Include="Shaders\particle.vert">
       <Filter>Resource Files\Shaders</Filter>
     </None>
     <None Include="Kernels\particles.cl">
       <Filter>Resource Files\Kernels</Filter>
     </None>
-    <None Include="Shaders\gravitor.fs">
+    <None Include="Shaders\gravitor.frag">
       <Filter>Resource Files\Shaders</Filter>
     </None>
-    <None Include="Shaders\gravitor.vs">
+    <None Include="Shaders\gravitor.vert">
       <Filter>Resource Files\Shaders</Filter>
     </None>
-    <None Include="particle_distance.fs">
+    <None Include="particle_distance.frag">
       <Filter>Resource Files\Shaders\Alternative</Filter>
     </None>
-    <None Include="particle_uv.fs">
+    <None Include="particle_uv.frag">
       <Filter>Resource Files\Shaders\Alternative</Filter>
     </None>
-    <None Include="particle_hsv.fs">
+    <None Include="particle_hsv.frag">
       <Filter>Resource Files\Shaders\Alternative</Filter>
     </None>
   </ItemGroup>
