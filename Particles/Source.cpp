@@ -21,12 +21,6 @@ void remove_dead_particles(Particle* particles, size_t& particleCount)
         --particleCount;
     }
 }
-glm::vec2 cursor_to_world_position(glm::vec2 cursorScreenPosition, float modelScale, glm::vec3 viewOffset, glm::uvec2 windowDimensions)
-{
-    return glm::vec2(
-        ( cursorScreenPosition.x * 2 / windowDimensions.x - viewOffset.x - 1.0f) / modelScale,
-        (-cursorScreenPosition.y * 2 / windowDimensions.y - viewOffset.y + 1.0f) / modelScale);
-}
 void generatorTestFunc()
 {
     std::vector<Particle> particles;
@@ -71,12 +65,6 @@ void generatorTestFunc()
 
     exit(1);
 }
-
-enum t
-{
-    a = 0, 
-    b = 1
-};
 
 int main(int argc, char* argv[])
 {
