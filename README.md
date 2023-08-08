@@ -4,7 +4,7 @@ Simulate millions of particles simultaneously on the GPU
 ## Properties
 * Allocates an OpenGL vertex buffer which is shared by OpenCL
 * OpenCL kernels calculate particle position every frame
-* No data is moved after initial setup (if energy is disabled), which gives significantly improved performance
+* No data is moved after initial setup (if lifetime is disabled), which gives significantly improved performance
 
 ## Performance
 Computer specs:  
@@ -24,7 +24,7 @@ The table below shows the average framerate for a given particle count.
 |  5 000 000 |    109.36 |     9.14ms |        no |
 | 10 000 000 |     58.75 |    17.02ms |        no |
 
-As you can see, moving data between the CPU and GPU causes a large performance loss, even for small amounts of data.  
+Moving data between the CPU and GPU causes a large performance loss, even for small amounts of data. 
 
 ## Controls
 * [M1] place gravitor
