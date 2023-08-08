@@ -13,16 +13,16 @@ GPU: GTX 1060 6GB
 
 The table below shows the average framerate for a given particle count.
 
-|  Particles | Framerate |  Frametime | Energy? |
-|:----------:|:---------:|:----------:|:-------:|
-|    100 000 |   1408.64 |     0.71ms |      no |
-|    100 000 |    359.85 |     2.78ms |     yes |
-|  1 000 000 |    413.63 |     2.42ms |      no |
-|  1 000 000 |     64.97 |    15.39ms |     yes |
-|  3 000 000 |    155.32 |     6.44ms |      no |
-|  3 000 000 |     26.87 |    37.22ms |     yes |
-|  5 000 000 |    109.36 |     9.14ms |      no |
-| 10 000 000 |     58.75 |    17.02ms |      no |
+|  Particles | Framerate |  Frametime | Lifetime? |
+|:----------:|:---------:|:----------:|:---------:|
+|    100 000 |   1408.64 |     0.71ms |        no |
+|    100 000 |    359.85 |     2.78ms |       yes |
+|  1 000 000 |    413.63 |     2.42ms |        no |
+|  1 000 000 |     64.97 |    15.39ms |       yes |
+|  3 000 000 |    155.32 |     6.44ms |        no |
+|  3 000 000 |     26.87 |    37.22ms |       yes |
+|  5 000 000 |    109.36 |     9.14ms |        no |
+| 10 000 000 |     58.75 |    17.02ms |        no |
 
 As you can see, moving data between the CPU and GPU causes a large performance loss, even for small amounts of data.  
 
